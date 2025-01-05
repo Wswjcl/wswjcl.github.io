@@ -1,0 +1,153 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>水博客 | Sugle's Blog</title><meta name="author" content="Sugle"><meta name="copyright" content="Sugle"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="我又来水了！别人写博客都是记录自己的技术经验，我也会的，不过现在还在积累阶段。 生命只有一次，我们很多人都知道，但是都不以为意。我们的人生不在一条既定的路上，而是在旷野中。我不想被自己束缚，被所谓的“浪费时间”束缚。 这几年来，我除了逃避，就是以“浪费时间”作为借口来跳过一些事情。但往往这些事情才是应该经历的，感受的。我应该被称为“逃兵”，但是我有能力、有机会、有时间去创造一条不是逃兵的人生。 何">
+<meta property="og:type" content="article">
+<meta property="og:title" content="水博客">
+<meta property="og:url" content="http://example.com/2025/01/06/%E6%B0%B4%E5%8D%9A%E5%AE%A2/index.html">
+<meta property="og:site_name" content="Sugle&#39;s Blog">
+<meta property="og:description" content="我又来水了！别人写博客都是记录自己的技术经验，我也会的，不过现在还在积累阶段。 生命只有一次，我们很多人都知道，但是都不以为意。我们的人生不在一条既定的路上，而是在旷野中。我不想被自己束缚，被所谓的“浪费时间”束缚。 这几年来，我除了逃避，就是以“浪费时间”作为借口来跳过一些事情。但往往这些事情才是应该经历的，感受的。我应该被称为“逃兵”，但是我有能力、有机会、有时间去创造一条不是逃兵的人生。 何">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://example.com/img/head.png">
+<meta property="article:published_time" content="2025-01-05T18:56:00.000Z">
+<meta property="article:modified_time" content="2025-01-05T18:58:54.807Z">
+<meta property="article:author" content="Sugle">
+<meta property="article:tag" content="经验">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/img/head.png"><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="http://example.com/2025/01/06/%E6%B0%B4%E5%8D%9A%E5%AE%A2/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":true,"highlightMacStyle":true},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '水博客',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: false,
+  isShuoshuo: false
+}</script><meta name="generator" content="Hexo 7.3.0"></head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/head.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">3</div></a><a href="/source/tags/"><div class="headline">标签</div><div class="length-num">2</div></a><a href="/source/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fa fa-archive"></i><span> Archives</span></a></div><div class="menus_item"><a class="site-page" href="/source/categories/"><i class="fa-fw fas fa-th"></i><span> Categories</span></a></div><div class="menus_item"><a class="site-page" href="/source/tags/"><i class="fa-fw fas fa-tags"></i><span> Tags</span></a></div><div class="menus_item"><a class="site-page" href="/source/music/"><i class="fa-fw fas fa-music"></i><span> Music</span></a></div><div class="menus_item"><a class="site-page" href="/source/about/"><i class="fa-fw fas fa-heart"></i><span> About</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">Sugle's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">水博客</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fa fa-archive"></i><span> Archives</span></a></div><div class="menus_item"><a class="site-page" href="/source/categories/"><i class="fa-fw fas fa-th"></i><span> Categories</span></a></div><div class="menus_item"><a class="site-page" href="/source/tags/"><i class="fa-fw fas fa-tags"></i><span> Tags</span></a></div><div class="menus_item"><a class="site-page" href="/source/music/"><i class="fa-fw fas fa-music"></i><span> Music</span></a></div><div class="menus_item"><a class="site-page" href="/source/about/"><i class="fa-fw fas fa-heart"></i><span> About</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">水博客</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2025-01-05T18:56:00.000Z" title="发表于 2025-01-06 02:56:00">2025-01-06</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2025-01-05T18:58:54.807Z" title="更新于 2025-01-06 02:58:54">2025-01-06</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/source/categories/Blog/">Blog</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><p>我又来水了！别人写博客都是记录自己的技术经验，我也会的，不过现在还在积累阶段。</p>
+<p>生命只有一次，我们很多人都知道，但是都不以为意。我们的人生不在一条既定的路上，而是在旷野中。我不想被自己束缚，被所谓的“浪费时间”束缚。</p>
+<p>这几年来，我除了逃避，就是以“浪费时间”作为借口来跳过一些事情。但往往这些事情才是应该经历的，感受的。我应该被称为“逃兵”，但是我有能力、有机会、有时间去创造一条不是逃兵的人生。</p>
+<p>何须惧怕到头来一场空，命运给予的礼物已经在面前了。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="http://example.com">Sugle</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="http://example.com/2025/01/06/%E6%B0%B4%E5%8D%9A%E5%AE%A2/">http://example.com/2025/01/06/%E6%B0%B4%E5%8D%9A%E5%AE%A2/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="http://example.com" target="_blank">Sugle's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/source/tags/%E7%BB%8F%E9%AA%8C/">经验</a></div><div class="post-share"><div class="social-share" data-image="/img/head.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/2025/01/01/2024-%E7%83%A6%E6%81%BC/" title="2024-烦恼"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">2024-烦恼</div></div><div class="info-2"><div class="info-item-1">夜晚真的会令人思考一些平常忽略的事情。 对我来说，2024年是一个烦恼很多的年份，但是我基本逃避了半年以上的时间。我总是认为还有时间去解决那些问题，但是岁月告诉了我已经没有时间了，甚至已经不可能去解决这些问题了。 不论是亲人，还是学业，这些事情都是没有办法等待的，一旦错过，极有可能需要花出成倍的时间才能解决，甚至无法解决成为一辈子的遗憾。所以，我应该放弃逃避这个选项，现在的压力远远没有到我承受的极限。而且，对我来说，压力到极限后再崩溃远远比在内耗中崩溃更容易接受。 我不知道应该怎么写下我的感受。我害怕亲人离世，害怕亲人间的不和，害怕还没让奶奶享福就结束了，害怕学业路上一场空，害怕朋友离开，害怕自己跟不上这个时代。我想哭，我真的很想大哭一场，但是我知道哭完后这种感觉就很难再体会了。我想要带着这些害怕上路，因为我害怕我会重蹈覆辙。 </div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2024/12/23/Hello-life/" title="Hello life &amp; Building a Blog"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2024-12-23</div><div class="info-item-2">Hello life &amp; Building a Blog</div></div><div class="info-2"><div class="info-item-1">我从高中就开始希望能搭建自己的博客，却一直没有行动，这一直是我的遗憾。但今天我简易地搭建了这个博客，虽然它很简陋，但对我来说意义非凡。它是我少年梦地代表，也会是我重新拾起信心的开端。 我只希望我能证明一点，我有尽全力做事的能力! 准备 本次搭建，使用Hexo框架和Butterfly主题在Github上进行部署，使用Github Action进行自动化处理。因此，需要在Github上创建两个库，一个私有库用来保存博客的源代码，另一个公开库托管静态网页。  部署 博客本体 主要文件结构：  1234567891011121314151617181920212223├── .gitignore├── _config.yml├── _config.butterfly.yml├── yarn.lock├── package.json├── .github│   └── workflows│      └── deploy.yml├── scaffolds│   ├── draft.md│   ├── page.md│   └── post.md├── source│   ├──...</div></div></div></a></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/head.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Sugle</div><div class="author-info-description">人生是旷野</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">3</div></a><a href="/source/tags/"><div class="headline">标签</div><div class="length-num">2</div></a><a href="/source/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/Wswjcl"><i class="fab fa-github"></i><span>Follow Me</span></a></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">允许自己犯错，但不允许自己不学习！</div></div><div class="sticky_layout"><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/01/06/%E6%B0%B4%E5%8D%9A%E5%AE%A2/" title="水博客">水博客</a><time datetime="2025-01-05T18:56:00.000Z" title="发表于 2025-01-06 02:56:00">2025-01-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/01/01/2024-%E7%83%A6%E6%81%BC/" title="2024-烦恼">2024-烦恼</a><time datetime="2024-12-31T19:55:00.000Z" title="发表于 2025-01-01 03:55:00">2025-01-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2024/12/23/Hello-life/" title="Hello life &amp; Building a Blog">Hello life &amp; Building a Blog</a><time datetime="2024-12-23T14:05:42.000Z" title="发表于 2024-12-23 22:05:42">2024-12-23</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2019 - 2025 By Sugle</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><div class="js-pjax"></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
