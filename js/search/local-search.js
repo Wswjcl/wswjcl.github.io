@@ -54,12 +54,22 @@ class LocalSearch {
   }
 
   // Merge hits into slices
-  mergeIntoSlice (start, end, index) {
-    let item = index[0]
+  mergeIntoSlice (start, end, index, startIndex = 0) {
+    let item = index[startIndex]
+    if (!item) {
+      return {
+        hits: [],
+        start,
+        end,
+        count: 0,
+        nextIndex: startIndex
+      }
+    }
     let { position, word } = item
     const hits = []
     const count = new Set()
-    while (position + word.length <= end && index.length !== 0) {
+    let currentIndex = startIndex
+    while (position + word.length <= end && currentIndex < index.length) {
       count.add(word)
       hits.push({
         position,
@@ -68,13 +78,13 @@ class LocalSearch {
       const wordEnd = position + word.length
 
       // Move to next position of hit
-      index.shift()
-      while (index.length !== 0) {
-        item = index[0]
+      currentIndex++
+      while (currentIndex < index.length) {
+        item = index[currentIndex]
         position = item.position
         word = item.word
         if (wordEnd > position) {
-          index.shift()
+          currentIndex++
         } else {
           break
         }
@@ -84,7 +94,8 @@ class LocalSearch {
       hits,
       start,
       end,
-      count: count.size
+      count: count.size,
+      nextIndex: currentIndex
     }
   }
 
@@ -119,13 +130,16 @@ class LocalSearch {
       }
 
       let slicesOfContent = []
-      while (indexOfContent.length !== 0) {
-        const item = indexOfContent[0]
+      let nextContentIndex = 0
+      while (nextContentIndex < indexOfContent.length) {
+        const item = indexOfContent[nextContentIndex]
         const { position } = item
         // Cut out 120 characters. The maxlength of .search-input is 80.
         const start = Math.max(0, position - 20)
         const end = Math.min(content.length, position + 100)
-        slicesOfContent.push(this.mergeIntoSlice(start, end, indexOfContent))
+        const slice = this.mergeIntoSlice(start, end, indexOfContent, nextContentIndex)
+        slicesOfContent.push(slice)
+        nextContentIndex = slice.nextIndex
       }
 
       // Sort slices in content by included keywords' count and hits' count
