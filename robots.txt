@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://wswjcl.github.io/sitemap.xml
