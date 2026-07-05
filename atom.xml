@@ -10,7 +10,7 @@
   <rights>All rights reserved 2026, Sugle</rights>
   <subtitle>人生是旷野</subtitle>
   <title>Sugle's Blog</title>
-  <updated>2026-07-05T03:12:55.629Z</updated>
+  <updated>2026-07-05T04:59:48.934Z</updated>
   <entry>
     <author>
       <name>Sugle</name>
@@ -25,13 +25,13 @@
     <published>2026-07-01T04:00:00.000Z</published>
     <summary>全面深入地讲解 Transformer 架构，涵盖 Self-Attention、Multi-Head Attention、位置编码、Encoder-Decoder 及主流变体。</summary>
     <title>Transformer 详解</title>
-    <updated>2026-07-05T03:12:55.629Z</updated>
+    <updated>2026-07-05T04:59:48.934Z</updated>
   </entry>
   <entry>
     <author>
       <name>Sugle</name>
     </author>
-    <category term="2024" scheme="https://wswjcl.github.io/categories/2024/"/>
+    <category term="2025" scheme="https://wswjcl.github.io/categories/2025/"/>
     <category term="生活随笔" scheme="https://wswjcl.github.io/tags/%E7%94%9F%E6%B4%BB%E9%9A%8F%E7%AC%94/"/>
     <content>
       <![CDATA[<p>人生真是充满意外和惊喜。25年绝对是我命运改变的节点，不知道从何处开始说起。</p><p>短短的半年我经历了恋爱、考研，诸事不顺。到现在，我才将将可以安心一小段时间。现在的我只能回忆起自己经历了剧变、痛苦，但是一点也想不起具体细节了<br>可能是身体在保护我。</p><p>我应该为自己搏出一个未来。</p>]]>
@@ -41,7 +41,7 @@
     <published>2026-03-21T14:36:00.000Z</published>
     <summary>2025年是命运改变的节点，关于这一年的回顾与感悟。</summary>
     <title>2025-回顾</title>
-    <updated>2026-07-05T03:12:55.629Z</updated>
+    <updated>2026-07-05T04:59:48.934Z</updated>
   </entry>
   <entry>
     <author>
@@ -57,7 +57,7 @@
     <published>2025-06-30T16:00:00.000Z</published>
     <summary>一个比较奇怪的时刻，关于2025年7月的一些思考。</summary>
     <title>2025-7思考</title>
-    <updated>2026-07-05T03:12:55.629Z</updated>
+    <updated>2026-07-05T04:59:48.934Z</updated>
   </entry>
   <entry>
     <author>
@@ -73,7 +73,7 @@
     <published>2025-01-08T11:55:00.000Z</published>
     <summary>从&quot;最低限度&quot;的行动模式到重新思考为什么要全力以赴，一次自我反思的记录。</summary>
     <title>关于为什么要证明尽全力的思考</title>
-    <updated>2026-07-05T03:12:55.629Z</updated>
+    <updated>2026-07-05T04:59:48.934Z</updated>
   </entry>
   <entry>
     <author>
@@ -89,7 +89,7 @@
     <published>2025-01-05T18:56:00.000Z</published>
     <summary>记录博客搭建过程中的点滴，技术经验还在积累中，先水一篇。</summary>
     <title>水博客</title>
-    <updated>2026-07-05T03:12:55.629Z</updated>
+    <updated>2026-07-05T04:59:48.934Z</updated>
   </entry>
   <entry>
     <author>
@@ -105,7 +105,7 @@
     <published>2024-12-31T19:55:00.000Z</published>
     <summary>夜晚总会让人思考一些平常忽略的事情，关于2024年的烦恼与感悟。</summary>
     <title>2024-烦恼</title>
-    <updated>2026-07-05T03:12:55.629Z</updated>
+    <updated>2026-07-05T04:59:48.934Z</updated>
   </entry>
   <entry>
     <author>
@@ -123,6 +123,6 @@
     <title>
       <![CDATA[Hello life & Building a Blog]]>
     </title>
-    <updated>2026-07-05T03:12:55.629Z</updated>
+    <updated>2026-07-05T04:59:48.934Z</updated>
   </entry>
 </feed>
