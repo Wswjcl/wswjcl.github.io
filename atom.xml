@@ -10,7 +10,23 @@
   <rights>All rights reserved 2026, Sugle</rights>
   <subtitle>人生是旷野</subtitle>
   <title>Sugle's Blog</title>
-  <updated>2026-07-09T14:10:41.393Z</updated>
+  <updated>2026-07-09T14:33:02.421Z</updated>
+  <entry>
+    <author>
+      <name>Sugle</name>
+    </author>
+    <category term="技术" scheme="https://wswjcl.github.io/categories/%E6%8A%80%E6%9C%AF/"/>
+    <category term="深度学习" scheme="https://wswjcl.github.io/tags/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0/"/>
+    <content>
+      <![CDATA[<p>文本分块之后，RAG 管线的下一步是将文本转换为向量——这就是嵌入模型（Embedding Model）的职责。嵌入模型将人类可读的文本映射到高维向量空间中，使得语义相近的文本在向量空间中距离更近，从而让”找相似内容”这一操作变为数学上的向量近邻搜索。</p><p>本文将深入探讨嵌入模型的原理、训练方法、主流模型选型与实战考量。</p><hr><h2 id="一、从词嵌入到文档嵌入"><a href="#一、从词嵌入到文档嵌入" class="headerlink" title="一、从词嵌入到文档嵌入"></a>一、从词嵌入到文档嵌入</h2><h3 id="1-1-词嵌入的演进"><a href="#1-1-词嵌入的演进" class="headerlink" title="1.1 词嵌入的演进"></a>1.1 词嵌入的演进</h3><p>自然语言的离散性是机器处理的核心障碍。嵌入（Embedding）的核心思想是将离散符号映射为连续向量，使得语义关系可以通过向量运算来表达。</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    OHE[&quot;One-Hot 编码&lt;br/&gt;维度=词表大小&lt;br/&gt;向量正交，无语义信息&quot;] --&gt; WE[&quot;Word2Vec / GloVe&lt;br/&gt;维度=300&lt;br/&gt;词级语义关系&quot;]</span><br><span class="line">    WE --&gt; CE[&quot;上下文化嵌入&lt;br/&gt;BERT / GPT&lt;br/&gt;维度=768-4096&lt;br/&gt;同一词不同含义不同向量&quot;]</span><br><span class="line">    CE --&gt; SE[&quot;句子/文档嵌入&lt;br/&gt;BGE / E5 / GTE&lt;br/&gt;维度=768-4096&lt;br/&gt;整段文本的语义表示&quot;]</span><br></pre></td></tr></table></figure><table><thead><tr><th>阶段</th><th>代表模型</th><th>特点</th></tr></thead><tbody><tr><td>One-Hot</td><td>—</td><td>高维稀疏，无语义，词间正交</td></tr><tr><td>静态词嵌入</td><td>Word2Vec, GloVe, FastText</td><td>低维稠密，词间有语义关系，但一词一向量</td></tr><tr><td>上下文化嵌入</td><td>BERT, GPT</td><td>同一词在不同上下文有不同表示，但需额外池化</td></tr><tr><td>文本嵌入</td><td>BGE, E5, GTE, Cohere</td><td>直接输出文本级的语义向量，专为检索设计</td></tr></tbody></table><h3 id="1-2-从词向量到文档向量"><a href="#1-2-从词向量到文档向量" class="headerlink" title="1.2 从词向量到文档向量"></a>1.2 从词向量到文档向量</h3><p>RAG 需要的不是单个词的向量，而是整段文本（查询或文档块）的向量表示。从词向量到文档向量，常见方法有：</p><ul><li><strong>平均池化</strong>：将所有 token 的向量取平均。简单但信息损失大。</li><li><strong>CLS token</strong>：取 BERT 类模型的 <code>[CLS]</code> token 输出。训练时需对 CLS 做专门优化。</li><li><strong>注意力池化</strong>：用可学习的注意力权重对 token 向量加权求和，更灵活。</li><li><strong>专用嵌入模型</strong>：直接训练一个”输入文本 → 输出向量”的模型，端到端优化。</li></ul><p>现代 RAG 几乎全部采用<strong>专用嵌入模型</strong>，而非在 LLM 之上做池化。</p><hr><h2 id="二、嵌入模型的核心原理"><a href="#二、嵌入模型的核心原理" class="headerlink" title="二、嵌入模型的核心原理"></a>二、嵌入模型的核心原理</h2><h3 id="2-1-语义空间"><a href="#2-1-语义空间" class="headerlink" title="2.1 语义空间"></a>2.1 语义空间</h3><p>嵌入模型将文本映射到一个 $d$ 维向量空间（通常 $d &#x3D; 768$ 或 $1024$），这个空间被称为<strong>语义空间</strong>。在语义空间中：</p><ul><li>语义相似的文本 → 向量距离近</li><li>语义不同的文本 → 向量距离远</li><li>语义关系可以用向量方向表示</li></ul><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">语义空间示意（2D 降维后）：</span><br><span class="line"></span><br><span class="line">    🐱 猫          🐕 狗</span><br><span class="line">       \          /</span><br><span class="line">        \        /</span><br><span class="line">         🐾 宠物</span><br><span class="line">        /        \</span><br><span class="line">       /          \</span><br><span class="line">    🚗 汽车      🚌 公交车</span><br></pre></td></tr></table></figure><h3 id="2-2-相似度度量"><a href="#2-2-相似度度量" class="headerlink" title="2.2 相似度度量"></a>2.2 相似度度量</h3><p>在语义空间中度量两个向量的相似程度，常用三种方式：</p><h4 id="余弦相似度（Cosine-Similarity）"><a href="#余弦相似度（Cosine-Similarity）" class="headerlink" title="余弦相似度（Cosine Similarity）"></a>余弦相似度（Cosine Similarity）</h4><p>$$\text{sim}(\mathbf{a}, \mathbf{b}) &#x3D; \frac{\mathbf{a} \cdot \mathbf{b}}{|\mathbf{a}| \cdot |\mathbf{b}|}$$</p><p>值域 $[-1, 1]$，衡量向量方向的相似性，不受向量长度影响。<strong>RAG 中最常用的度量方式</strong>。</p><h4 id="点积（Dot-Product-Inner-Product）"><a href="#点积（Dot-Product-Inner-Product）" class="headerlink" title="点积（Dot Product &#x2F; Inner Product）"></a>点积（Dot Product &#x2F; Inner Product）</h4><p>$$\text{sim}(\mathbf{a}, \mathbf{b}) &#x3D; \mathbf{a} \cdot \mathbf{b} &#x3D; \sum_{i&#x3D;1}^{d} a_i b_i$$</p><p>当向量已归一化（$|\mathbf{a}| &#x3D; |\mathbf{b}| &#x3D; 1$）时，点积等于余弦相似度。计算速度更快。</p><h4 id="欧氏距离（Euclidean-Distance）"><a href="#欧氏距离（Euclidean-Distance）" class="headerlink" title="欧氏距离（Euclidean Distance）"></a>欧氏距离（Euclidean Distance）</h4><p>$$\text{dist}(\mathbf{a}, \mathbf{b}) &#x3D; \sqrt{\sum_{i&#x3D;1}^{d} (a_i - b_i)^2}$$</p><p>值域 $[0, +\infty)$，衡量向量间的绝对距离。当向量归一化后，欧氏距离与余弦相似度单调相关。</p><p><strong>选择建议</strong>：RAG 中推荐使用<strong>余弦相似度</strong>，因为它对向量尺度不敏感，更鲁棒。如果向量已归一化，可以直接用点积加速计算。</p><h3 id="2-3-对比学习：嵌入模型的训练范式"><a href="#2-3-对比学习：嵌入模型的训练范式" class="headerlink" title="2.3 对比学习：嵌入模型的训练范式"></a>2.3 对比学习：嵌入模型的训练范式</h3><p>现代嵌入模型几乎都基于<strong>对比学习（Contrastive Learning）</strong>进行训练。其核心思想是：拉近正样本对的距离，推远负样本对的距离。</p><h4 id="InfoNCE-损失"><a href="#InfoNCE-损失" class="headerlink" title="InfoNCE 损失"></a>InfoNCE 损失</h4><p>最常用的对比学习损失函数：</p><p>$$\mathcal{L} &#x3D; -\log \frac{\exp(\text{sim}(q, d^+) &#x2F; \tau)}{\sum_{j&#x3D;1}^{N} \exp(\text{sim}(q, d_j) &#x2F; \tau)}$$</p><p>其中：</p><ul><li>$q$：查询（Query）的嵌入向量</li><li>$d^+$：正样本（与查询相关的文档）的嵌入向量</li><li>$d_j$：所有候选文档（包含正样本和负样本）的嵌入向量</li><li>$\tau$：温度超参数，控制分布的锐度</li><li>$N$：批次中的样本总数</li></ul><p>直观理解：在一批样本中，让查询与正确文档的相似度尽可能高，同时压低与错误文档的相似度。</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    Q[&quot;查询: 什么是注意力机制？&quot;] --- POS[&quot;正样本: Self-Attention 通过 Q K V 计算权重...&quot;]</span><br><span class="line">    Q -.- NEG1[&quot;负样本: 卷积神经网络在图像识别中...&quot;]</span><br><span class="line">    Q -.- NEG2[&quot;负样本: Python 是一种解释型语言...&quot;]</span><br><span class="line"></span><br><span class="line">    POS --&gt; LOSS[&quot;InfoNCE 损失&lt;br/&gt;拉近正样本，推远负样本&quot;]</span><br><span class="line">    NEG1 --&gt; LOSS</span><br><span class="line">    NEG2 --&gt; LOSS</span><br></pre></td></tr></table></figure><h4 id="负样本策略"><a href="#负样本策略" class="headerlink" title="负样本策略"></a>负样本策略</h4><p>负样本的质量对对比学习至关重要：</p><table><thead><tr><th>策略</th><th>描述</th><th>特点</th></tr></thead><tbody><tr><td>随机负采样</td><td>从语料库中随机选取</td><td>简单但区分度低（太容易区分）</td></tr><tr><td>批内负采样</td><td>同一 batch 内的其他样本作为负样本</td><td>高效，但负样本可能不够”难”</td></tr><tr><td>硬负挖掘</td><td>选取与查询相似但无关的文档作为负样本</td><td>训练信号更强，效果最好</td></tr><tr><td>LM-based 挖掘</td><td>用 LLM 生成困难负样本</td><td>自动化程度高</td></tr></tbody></table><p>硬负样本（Hard Negatives）是提升嵌入质量的关键。例如，对于查询”什么是注意力机制”，一个好的硬负样本是”注意力缺陷多动障碍（ADHD）的诊断标准”——包含关键词但语义不同。</p><hr><h2 id="三、主流嵌入模型对比"><a href="#三、主流嵌入模型对比" class="headerlink" title="三、主流嵌入模型对比"></a>三、主流嵌入模型对比</h2><h3 id="3-1-模型概览"><a href="#3-1-模型概览" class="headerlink" title="3.1 模型概览"></a>3.1 模型概览</h3><table><thead><tr><th>模型</th><th>开发方</th><th align="center">维度</th><th align="center">最大输入</th><th align="center">MTEB 排名</th><th>特点</th></tr></thead><tbody><tr><td><strong>BGE-large-zh</strong></td><td>智源 BAAI</td><td align="center">1024</td><td align="center">512</td><td align="center">顶尖（中文）</td><td>中文 RAG 首选，开源</td></tr><tr><td><strong>BGE-M3</strong></td><td>智源 BAAI</td><td align="center">1024</td><td align="center">8192</td><td align="center">顶尖</td><td>多语言+多功能+多粒度</td></tr><tr><td><strong>E5-large-v2</strong></td><td>微软</td><td align="center">1024</td><td align="center">512</td><td align="center">高</td><td>指令感知嵌入</td></tr><tr><td><strong>GTE-large-zh</strong></td><td>阿里达摩院</td><td align="center">1024</td><td align="center">512</td><td align="center">高（中文）</td><td>中文表现优秀</td></tr><tr><td><strong>GTE-Qwen2</strong></td><td>阿里达摩院</td><td align="center">1536</td><td align="center">32768</td><td align="center">顶尖</td><td>超长上下文，最新</td></tr><tr><td><strong>Cohere embed-v3</strong></td><td>Cohere</td><td align="center">1024</td><td align="center">512</td><td align="center">顶尖</td><td>商业 API，多语言</td></tr><tr><td><strong>OpenAI text-embedding-3</strong></td><td>OpenAI</td><td align="center">3072</td><td align="center">8191</td><td align="center">高</td><td>API 调用，支持维度截断</td></tr><tr><td><strong>bge-large-en</strong></td><td>智源 BAAI</td><td align="center">1024</td><td align="center">512</td><td align="center">高（英文）</td><td>英文 RAG 常用</td></tr></tbody></table><h3 id="3-2-选型考量"><a href="#3-2-选型考量" class="headerlink" title="3.2 选型考量"></a>3.2 选型考量</h3><p>选择嵌入模型时需综合考虑：</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    Q[&quot;选择嵌入模型&quot;] --&gt; L&#123;&quot;语言需求？&quot;&#125;</span><br><span class="line">    L --&gt;|中文为主| CN[&quot;BGE-large-zh / GTE-large-zh&quot;]</span><br><span class="line">    L --&gt;|英文为主| EN[&quot;E5-large-v2 / BGE-large-en&quot;]</span><br><span class="line">    L --&gt;|多语言| ML[&quot;BGE-M3 / Cohere embed-v3&quot;]</span><br><span class="line">    Q --&gt; S&#123;&quot;部署方式？&quot;&#125;</span><br><span class="line">    S --&gt;|自托管| SELF[&quot;开源模型: BGE / E5 / GTE&quot;]</span><br><span class="line">    S --&gt;|API 调用| API[&quot;OpenAI / Cohere&quot;]</span><br><span class="line">    Q --&gt; C&#123;&quot;长文本需求？&quot;&#125;</span><br><span class="line">    C --&gt;|文档超 512 token| LONG[&quot;BGE-M3 (8192) / GTE-Qwen2 (32768)&quot;]</span><br><span class="line">    C --&gt;|短文本为主| SHORT[&quot;标准模型即可&quot;]</span><br></pre></td></tr></table></figure><h3 id="3-3-指令感知嵌入"><a href="#3-3-指令感知嵌入" class="headerlink" title="3.3 指令感知嵌入"></a>3.3 指令感知嵌入</h3><p>一些嵌入模型支持在前缀加入指令（Instruction &#x2F; Prompt），针对不同任务生成更合适的嵌入：</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"># E5 的指令前缀示例</span><br><span class="line">query: &quot;What is attention mechanism?&quot;          → &quot;query: What is attention mechanism?&quot;</span><br><span class="line">document: &quot;Self-attention computes...&quot;          → &quot;passage: Self-attention computes...&quot;</span><br></pre></td></tr></table></figure><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"># BGE 的指令前缀示例</span><br><span class="line">query: &quot;什么是注意力机制？&quot;                     → &quot;为这个句子生成表示以用于检索相关文章：什么是注意力机制？&quot;</span><br><span class="line">document: &quot;Self-Attention 通过 Q K V...&quot;        → （无需前缀）</span><br></pre></td></tr></table></figure><p>指令前缀让模型知道当前文本的角色是”查询”还是”文档”，从而生成更有针对性的向量。<strong>使用时务必遵循模型的指令格式</strong>，否则效果会打折扣。</p><hr><h2 id="四、嵌入维度与语义表达能力"><a href="#四、嵌入维度与语义表达能力" class="headerlink" title="四、嵌入维度与语义表达能力"></a>四、嵌入维度与语义表达能力</h2><h3 id="4-1-维度的意义"><a href="#4-1-维度的意义" class="headerlink" title="4.1 维度的意义"></a>4.1 维度的意义</h3><p>嵌入维度 $d$ 决定了语义空间的表达能力：</p><ul><li>维度太低 → 语义空间不足以区分细粒度差异（欠拟合）</li><li>维度太高 → 向量稀疏，计算和存储成本增加（过拟合风险）</li></ul><p>主流嵌入模型的维度在 768-3072 之间。经验上，768 维已经足够覆盖大多数语义信息。</p><h3 id="4-2-维度截断（Matryoshka-Embeddings）"><a href="#4-2-维度截断（Matryoshka-Embeddings）" class="headerlink" title="4.2 维度截断（Matryoshka Embeddings）"></a>4.2 维度截断（Matryoshka Embeddings）</h3><p>OpenAI 的 <code>text-embedding-3</code> 支持<strong>维度截断</strong>：可以从 3072 维向量中截取前 256&#x2F;512&#x2F;1024 维使用，而不会严重损失语义信息。</p><p>原理：训练时使用 <strong>Matryoshka Representation Learning（MRL）</strong>，使得向量的前 $k$ 维就是 $k$ 维空间中的最优表示。</p><p>$$\mathcal{L}<em>{\text{MRL}} &#x3D; \sum</em>{k \in {256, 512, 1024, 3072}} \mathcal{L}<em>{\text{InfoNCE}}(\mathbf{h}</em>{1:k})$$</p><p>这意味着你可以用一个模型同时满足不同场景：</p><ul><li>粗筛场景：用 256 维，速度快</li><li>精排场景：用 1024 维，精度高</li><li>存储优化：用 512 维，节省空间</li></ul><hr><h2 id="五、多语言与跨语言嵌入"><a href="#五、多语言与跨语言嵌入" class="headerlink" title="五、多语言与跨语言嵌入"></a>五、多语言与跨语言嵌入</h2><h3 id="5-1-多语言嵌入的挑战"><a href="#5-1-多语言嵌入的挑战" class="headerlink" title="5.1 多语言嵌入的挑战"></a>5.1 多语言嵌入的挑战</h3><p>不同语言的语义空间需要对齐——“cat”和”猫”在向量空间中应该距离很近。这需要：</p><ol><li><strong>多语言训练数据</strong>：覆盖足够多的语言对</li><li><strong>跨语言对比学习</strong>：正样本对包含不同语言的等价文本</li><li><strong>共享语义空间</strong>：所有语言映射到同一向量空间</li></ol><h3 id="5-2-跨语言检索"><a href="#5-2-跨语言检索" class="headerlink" title="5.2 跨语言检索"></a>5.2 跨语言检索</h3><p>跨语言嵌入允许用一种语言的查询检索另一种语言的文档：</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">查询（中文）: &quot;注意力机制的原理&quot;</span><br><span class="line">→ 嵌入向量 → 检索</span><br><span class="line">→ 返回英文文档: &quot;The principle of attention mechanism...&quot;</span><br></pre></td></tr></table></figure><p>这在多语言知识库中非常有用，避免了对每种语言分别建索引的麻烦。</p><p><strong>推荐模型</strong>：BGE-M3（支持 100+ 语言）、Cohere embed-v3（多语言优化）。</p><hr><h2 id="六、嵌入模型的实战考量"><a href="#六、嵌入模型的实战考量" class="headerlink" title="六、嵌入模型的实战考量"></a>六、嵌入模型的实战考量</h2><h3 id="6-1-归一化"><a href="#6-1-归一化" class="headerlink" title="6.1 归一化"></a>6.1 归一化</h3><p>大多数嵌入模型输出的向量已经过归一化（$|\mathbf{h}| &#x3D; 1$），但部分模型不是。<strong>建议在使用前统一做 L2 归一化</strong>：</p><p>$$\hat{\mathbf{h}} &#x3D; \frac{\mathbf{h}}{|\mathbf{h}|}$$</p><p>归一化后余弦相似度 &#x3D; 点积，可以简化计算。</p><h3 id="6-2-查询与文档的嵌入差异"><a href="#6-2-查询与文档的嵌入差异" class="headerlink" title="6.2 查询与文档的嵌入差异"></a>6.2 查询与文档的嵌入差异</h3><p>许多嵌入模型要求查询和文档使用不同的前缀（如 E5 的 <code>query:</code> vs <code>passage:</code>）。这是因为训练时查询和文档的语义分布不同，模型需要知道输入的角色。</p><p><strong>常见错误</strong>：对查询和文档使用相同的前缀，或不使用前缀。这会导致检索效果显著下降。</p><h3 id="6-3-嵌入缓存与增量更新"><a href="#6-3-嵌入缓存与增量更新" class="headerlink" title="6.3 嵌入缓存与增量更新"></a>6.3 嵌入缓存与增量更新</h3><ul><li><strong>嵌入缓存</strong>：对不变的分块缓存其嵌入向量，避免重复计算</li><li><strong>增量更新</strong>：新增文档时只计算新分块的嵌入，不影响已有索引</li><li><strong>模型切换</strong>：更换嵌入模型时需要重新计算所有嵌入，成本较高</li></ul><h3 id="6-4-批量推理优化"><a href="#6-4-批量推理优化" class="headerlink" title="6.4 批量推理优化"></a>6.4 批量推理优化</h3><p>对大量文档做嵌入时，应使用批量推理（Batch Inference）而非逐条处理：</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">❌ 低效: for chunk in chunks: embedding = model.encode(chunk)</span><br><span class="line">✅ 高效: embeddings = model.encode(chunks, batch_size=256)</span><br></pre></td></tr></table></figure><p>批量推理可以充分利用 GPU 并行能力，速度提升 10-50 倍。</p><hr><h2 id="七、嵌入模型的评估"><a href="#七、嵌入模型的评估" class="headerlink" title="七、嵌入模型的评估"></a>七、嵌入模型的评估</h2><h3 id="7-1-MTEB-排行榜"><a href="#7-1-MTEB-排行榜" class="headerlink" title="7.1 MTEB 排行榜"></a>7.1 MTEB 排行榜</h3><p><a href="https://huggingface.co/spaces/mteb/leaderboard">MTEB（Massive Text Embedding Benchmark）</a> 是目前最权威的嵌入模型评估基准，涵盖 7 个任务类别：</p><table><thead><tr><th>任务类别</th><th>说明</th></tr></thead><tbody><tr><td>Classification</td><td>文本分类</td></tr><tr><td>Clustering</td><td>文本聚类</td></tr><tr><td>Pair Classification</td><td>文本对分类</td></tr><tr><td>Reranking</td><td>重排序</td></tr><tr><td>Retrieval</td><td>信息检索（<strong>RAG 最相关</strong>）</td></tr><tr><td>Semantic Textual Similarity</td><td>语义相似度</td></tr><tr><td>Summarization</td><td>摘要质量</td></tr></tbody></table><h3 id="7-2-自建评估"><a href="#7-2-自建评估" class="headerlink" title="7.2 自建评估"></a>7.2 自建评估</h3><p>MTEB 是通用评估，你的具体场景可能不同。建议自建评估：</p><ol><li>构建一批<strong>（查询, 相关文档, 无关文档）</strong>三元组</li><li>计算查询与所有文档的相似度</li><li>检查相关文档是否排在 Top-K 中</li><li>计算 Recall@K、MRR、nDCG 等指标</li></ol><h3 id="7-3-关键指标"><a href="#7-3-关键指标" class="headerlink" title="7.3 关键指标"></a>7.3 关键指标</h3><table><thead><tr><th>指标</th><th>含义</th><th>适用场景</th></tr></thead><tbody><tr><td><strong>Recall@K</strong></td><td>前 K 个结果中包含正确答案的比例</td><td>RAG 检索评估</td></tr><tr><td><strong>MRR</strong></td><td>第一个正确答案的排名倒数</td><td>单答案检索</td></tr><tr><td><strong>nDCG@K</strong></td><td>考虑排序位置的归一化增益</td><td>多级相关性评估</td></tr></tbody></table><hr><h2 id="八、小结"><a href="#八、小结" class="headerlink" title="八、小结"></a>八、小结</h2><p>嵌入模型是 RAG 的”感知器官”，将文本转换为可计算的向量，是检索质量的基础。本文的核心要点：</p><ul><li>嵌入模型从词嵌入演进到文档嵌入，现代 RAG 使用专用的文本嵌入模型</li><li>对比学习是训练范式的核心，InfoNCE 损失 + 硬负样本是关键</li><li>选型需考虑语言、部署方式、上下文长度，中文推荐 BGE &#x2F; GTE 系列</li><li>维度截断（Matryoshka）技术允许灵活权衡精度与效率</li><li>使用时注意指令前缀、归一化、批量推理等实战细节</li></ul><p><strong>下一篇</strong>，我们将探讨嵌入向量的存储与索引——如何在十亿级向量中实现毫秒级检索。</p><hr><p><strong>参考论文与资源</strong>：</p><ul><li>Neelakantan, A., et al. <em>Text and Code Embeddings by Contrastive Pre-Training</em>. arXiv 2022.</li><li>Xiao, S., et al. <em>BGE: C-Pack: Packaged Resources for General Chinese Embeddings</em>. arXiv 2023.</li><li>Wang, L., et al. <em>Text Embeddings by Weakly-Supervised Contrastive Pre-training</em>. arXiv 2022.</li><li>Muennighoff, N., et al. <em>MTEB: Massive Text Embedding Benchmark</em>. arXiv 2023.</li><li>Kusupati, A., et al. <em>Matryoshka Representation Learning</em>. NeurIPS 2022.</li><li>Chen, J., et al. <em>BGE M3: Versatile Text Embeddings</em>. arXiv 2024.</li></ul>]]>
+    </content>
+    <id>https://wswjcl.github.io/posts/6701eaf8/</id>
+    <link href="https://wswjcl.github.io/posts/6701eaf8/"/>
+    <published>2026-07-09T08:00:00.000Z</published>
+    <summary>深入讲解 RAG 中的嵌入模型，涵盖主流模型对比、对比学习训练范式、语义空间与相似度度量、多语言嵌入等核心技术。</summary>
+    <title>RAG 系列（三）：嵌入模型 — 让文本可计算</title>
+    <updated>2026-07-09T14:33:02.421Z</updated>
+  </entry>
   <entry>
     <author>
       <name>Sugle</name>
@@ -25,7 +41,7 @@
     <published>2026-07-09T06:00:00.000Z</published>
     <summary>深入讲解 RAG 系统中的文档解析与文本分块策略，涵盖固定大小分块、语义分块、递归分块等方法及 Chunk Size 权衡。</summary>
     <title>RAG 系列（二）：文档处理与分块 — RAG 的基石</title>
-    <updated>2026-07-09T14:10:41.393Z</updated>
+    <updated>2026-07-09T14:33:02.421Z</updated>
   </entry>
   <entry>
     <author>
@@ -41,7 +57,7 @@
     <published>2026-07-09T04:00:00.000Z</published>
     <summary>全面介绍 RAG（检索增强生成）的核心架构、演进路径与应用场景，开启 RAG 系列技术博客。</summary>
     <title>RAG 系列（一）：概述 — 从检索到生成的范式革命</title>
-    <updated>2026-07-09T14:10:41.393Z</updated>
+    <updated>2026-07-09T14:33:02.421Z</updated>
   </entry>
   <entry>
     <author>
@@ -57,7 +73,7 @@
     <published>2026-07-01T04:00:00.000Z</published>
     <summary>全面深入地讲解 Transformer 架构，涵盖 Self-Attention、Multi-Head Attention、位置编码、Encoder-Decoder 及主流变体。</summary>
     <title>Transformer 详解</title>
-    <updated>2026-07-09T14:10:41.393Z</updated>
+    <updated>2026-07-09T14:33:02.421Z</updated>
   </entry>
   <entry>
     <author>
@@ -73,7 +89,7 @@
     <published>2026-03-21T14:36:00.000Z</published>
     <summary>2025年是命运改变的节点，关于这一年的回顾与感悟。</summary>
     <title>2025-回顾</title>
-    <updated>2026-07-09T14:10:41.393Z</updated>
+    <updated>2026-07-09T14:33:02.421Z</updated>
   </entry>
   <entry>
     <author>
@@ -89,7 +105,7 @@
     <published>2025-06-30T16:00:00.000Z</published>
     <summary>一个比较奇怪的时刻，关于2025年7月的一些思考。</summary>
     <title>2025-7思考</title>
-    <updated>2026-07-09T14:10:41.393Z</updated>
+    <updated>2026-07-09T14:33:02.421Z</updated>
   </entry>
   <entry>
     <author>
@@ -105,7 +121,7 @@
     <published>2025-01-08T11:55:00.000Z</published>
     <summary>从&quot;最低限度&quot;的行动模式到重新思考为什么要全力以赴，一次自我反思的记录。</summary>
     <title>关于为什么要证明尽全力的思考</title>
-    <updated>2026-07-09T14:10:41.393Z</updated>
+    <updated>2026-07-09T14:33:02.421Z</updated>
   </entry>
   <entry>
     <author>
@@ -121,7 +137,7 @@
     <published>2025-01-05T18:56:00.000Z</published>
     <summary>记录博客搭建过程中的点滴，技术经验还在积累中，先水一篇。</summary>
     <title>水博客</title>
-    <updated>2026-07-09T14:10:41.393Z</updated>
+    <updated>2026-07-09T14:33:02.421Z</updated>
   </entry>
   <entry>
     <author>
@@ -137,7 +153,7 @@
     <published>2024-12-31T19:55:00.000Z</published>
     <summary>夜晚总会让人思考一些平常忽略的事情，关于2024年的烦恼与感悟。</summary>
     <title>2024-烦恼</title>
-    <updated>2026-07-09T14:10:41.393Z</updated>
+    <updated>2026-07-09T14:33:02.421Z</updated>
   </entry>
   <entry>
     <author>
@@ -155,6 +171,6 @@
     <title>
       <![CDATA[Hello life & Building a Blog]]>
     </title>
-    <updated>2026-07-09T14:10:41.393Z</updated>
+    <updated>2026-07-09T14:33:02.421Z</updated>
   </entry>
 </feed>
