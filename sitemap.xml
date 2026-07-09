@@ -2,15 +2,6 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
-    <loc>https://wswjcl.github.io/music/</loc>
-    
-    <lastmod>2026-07-09</lastmod>
-    
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  
-  <url>
     <loc>https://wswjcl.github.io/now/</loc>
     
     <lastmod>2026-07-09</lastmod>
@@ -21,6 +12,15 @@
   
   <url>
     <loc>https://wswjcl.github.io/tags/</loc>
+    
+    <lastmod>2026-07-09</lastmod>
+    
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <url>
+    <loc>https://wswjcl.github.io/music/</loc>
     
     <lastmod>2026-07-09</lastmod>
     
@@ -74,6 +74,15 @@
   </url>
   
   <url>
+    <loc>https://wswjcl.github.io/posts/e2a2b1cb/</loc>
+    
+    <lastmod>2026-07-09</lastmod>
+    
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <url>
     <loc>https://wswjcl.github.io/posts/ceccca1e/</loc>
     
     <lastmod>2026-07-09</lastmod>
@@ -101,7 +110,7 @@
   </url>
   
   <url>
-    <loc>https://wswjcl.github.io/about/</loc>
+    <loc>https://wswjcl.github.io/categories/</loc>
     
     <lastmod>2026-07-09</lastmod>
     
@@ -110,7 +119,7 @@
   </url>
   
   <url>
-    <loc>https://wswjcl.github.io/categories/</loc>
+    <loc>https://wswjcl.github.io/about/</loc>
     
     <lastmod>2026-07-09</lastmod>
     
