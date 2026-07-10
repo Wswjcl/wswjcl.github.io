@@ -10,7 +10,23 @@
   <rights>All rights reserved 2026, Sugle</rights>
   <subtitle>人生是旷野</subtitle>
   <title>Sugle's Blog</title>
-  <updated>2026-07-09T14:33:02.421Z</updated>
+  <updated>2026-07-10T01:12:48.669Z</updated>
+  <entry>
+    <author>
+      <name>Sugle</name>
+    </author>
+    <category term="技术" scheme="https://wswjcl.github.io/categories/%E6%8A%80%E6%9C%AF/"/>
+    <category term="深度学习" scheme="https://wswjcl.github.io/tags/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0/"/>
+    <content>
+      <![CDATA[<p>嵌入模型将文本转换为向量后，下一个问题是：如何高效地存储和检索这些向量？当知识库只有几千条记录时，暴力搜索足矣；但当规模扩展到百万甚至十亿级时，就需要专门的<strong>向量数据库</strong>和<strong>近似最近邻（ANN）索引</strong>来支撑毫秒级检索。</p><p>本文将深入向量存储与索引的核心技术。</p><hr><h2 id="一、向量检索的挑战"><a href="#一、向量检索的挑战" class="headerlink" title="一、向量检索的挑战"></a>一、向量检索的挑战</h2><h3 id="1-1-维度灾难"><a href="#1-1-维度灾难" class="headerlink" title="1.1 维度灾难"></a>1.1 维度灾难</h3><p>给定一个查询向量 $\mathbf{q} \in \mathbb{R}^d$ 和 $N$ 个文档向量 ${\mathbf{v}_1, \dots, \mathbf{v}_N}$，精确最近邻搜索（Exact Nearest Neighbor, ENN）需要计算查询与所有 $N$ 个向量的相似度，时间复杂度为 $O(Nd)$。</p><p>当 $N &#x3D; 10^9$、$d &#x3D; 1024$ 时，单次查询需要 $10^{12}$ 次浮点运算——即使有 GPU 加速，延迟也远超可接受范围。</p><h3 id="1-2-精确-vs-近似"><a href="#1-2-精确-vs-近似" class="headerlink" title="1.2 精确 vs 近似"></a>1.2 精确 vs 近似</h3><p><strong>精确搜索</strong>保证找到真正的最近邻，但太慢。<br><strong>近似最近邻搜索（ANN）</strong>牺牲少量精度换取数量级的速度提升，在实际中检索召回率可达 95%+，延迟降低 100-1000 倍。</p><p>RAG 场景下，ANN 的精度损失完全可接受——因为我们本来就取 Top-K 结果再做重排序，少量遗漏可以通过后续环节弥补。</p><hr><h2 id="二、索引结构详解"><a href="#二、索引结构详解" class="headerlink" title="二、索引结构详解"></a>二、索引结构详解</h2><h3 id="2-1-Flat-索引（暴力搜索）"><a href="#2-1-Flat-索引（暴力搜索）" class="headerlink" title="2.1 Flat 索引（暴力搜索）"></a>2.1 Flat 索引（暴力搜索）</h3><p>最简单的”索引”：不做任何索引，直接遍历所有向量计算相似度。</p><ul><li><strong>优点</strong>：100% 召回率，实现最简单</li><li><strong>缺点</strong>：$O(Nd)$ 复杂度，大规模不可用</li><li><strong>适用</strong>：$N &lt; 10^4$ 的小规模场景</li></ul><h3 id="2-2-IVF-索引（倒排文件）"><a href="#2-2-IVF-索引（倒排文件）" class="headerlink" title="2.2 IVF 索引（倒排文件）"></a>2.2 IVF 索引（倒排文件）</h3><p>将向量空间划分为 $K$ 个聚类（Voronoi 单元），每个向量归属最近的聚类中心。检索时，只搜索查询最近的 $n_{\text{probe}}$ 个聚类中的向量。</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">索引构建:</span><br><span class="line">1. 对所有向量做 K-Means 聚类，得到 K 个聚类中心</span><br><span class="line">2. 将每个向量分配到其最近的聚类</span><br><span class="line">3. 每个聚类维护一个倒排列表（inverted file）</span><br><span class="line"></span><br><span class="line">检索:</span><br><span class="line">1. 计算查询与 K 个聚类中心的距离</span><br><span class="line">2. 选取最近的 n_probe 个聚类</span><br><span class="line">3. 在这些聚类内做暴力搜索</span><br></pre></td></tr></table></figure><ul><li><strong>复杂度</strong>：构建 $O(NKd)$，检索 $O(\frac{N \cdot n_{\text{probe}}}{K} \cdot d)$</li><li><strong>参数权衡</strong>：$n_{\text{probe}}$ 越大召回率越高但越慢，通常 $n_{\text{probe}} \ll K$</li><li><strong>适用</strong>：$10^5 \sim 10^7$ 规模</li></ul><h3 id="2-3-HNSW-索引（层级可导航小世界图）"><a href="#2-3-HNSW-索引（层级可导航小世界图）" class="headerlink" title="2.3 HNSW 索引（层级可导航小世界图）"></a>2.3 HNSW 索引（层级可导航小世界图）</h3><p>HNSW（Hierarchical Navigable Small World）是目前<strong>综合性能最优</strong>的 ANN 索引，被 Milvus、Qdrant、Weaviate 等主流向量数据库广泛采用。</p><h4 id="核心思想"><a href="#核心思想" class="headerlink" title="核心思想"></a>核心思想</h4><p>构建一个多层图结构：</p><ul><li><strong>上层</strong>：稀疏连接，节点少，用于快速跳跃到查询附近区域</li><li><strong>下层</strong>：稠密连接，节点多，用于精确定位最近邻</li><li>检索时从顶层开始，逐层向下贪心搜索，类似跳表（Skip List）</li></ul><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    subgraph L2[&quot;第 2 层（最稀疏）&quot;]</span><br><span class="line">        N2_1[&quot;A&quot;] --- N2_2[&quot;D&quot;]</span><br><span class="line">    end</span><br><span class="line"></span><br><span class="line">    subgraph L1[&quot;第 1 层&quot;]</span><br><span class="line">        N1_1[&quot;A&quot;] --- N1_2[&quot;B&quot;]</span><br><span class="line">        N1_2 --- N1_3[&quot;C&quot;]</span><br><span class="line">        N1_3 --- N1_4[&quot;D&quot;]</span><br><span class="line">        N1_1 --- N1_4</span><br><span class="line">    end</span><br><span class="line"></span><br><span class="line">    subgraph L0[&quot;第 0 层（最稠密）&quot;]</span><br><span class="line">        N0_1[&quot;A&quot;] --- N0_2[&quot;B&quot;]</span><br><span class="line">        N0_2 --- N0_3[&quot;C&quot;]</span><br><span class="line">        N0_3 --- N0_4[&quot;D&quot;]</span><br><span class="line">        N0_4 --- N0_5[&quot;E&quot;]</span><br><span class="line">        N0_5 --- N0_6[&quot;F&quot;]</span><br><span class="line">        N0_1 --- N0_3</span><br><span class="line">        N0_2 --- N0_4</span><br><span class="line">        N0_3 --- N0_5</span><br><span class="line">        N0_1 --- N0_6</span><br><span class="line">    end</span><br><span class="line"></span><br><span class="line">    N2_1 -.-&gt; N1_1</span><br><span class="line">    N2_2 -.-&gt; N1_4</span><br><span class="line">    N1_1 -.-&gt; N0_1</span><br><span class="line">    N1_2 -.-&gt; N0_2</span><br><span class="line">    N1_3 -.-&gt; N0_3</span><br><span class="line">    N1_4 -.-&gt; N0_4</span><br></pre></td></tr></table></figure><h4 id="构建算法"><a href="#构建算法" class="headerlink" title="构建算法"></a>构建算法</h4><ol><li>为新节点随机分配一个层级 $l$（服从几何分布，越高概率越低）</li><li>从顶层入口点开始，逐层向下贪心搜索，找到每层的最近邻</li><li>在第 0 到 $l$ 层，将新节点与其最近的 $M$ 个邻居连接（$M$ 为最大连接数）</li></ol><p>层级分配概率：</p><p>$$P(l &#x3D; k) &#x3D; (1 - m_L) \cdot m_L^k, \quad m_L &#x3D; \frac{1}{M_0}$$</p><p>其中 $M_0$ 是第 0 层的最大连接数。这保证了上层节点稀疏、下层节点稠密。</p><h4 id="检索算法"><a href="#检索算法" class="headerlink" title="检索算法"></a>检索算法</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">HNSW_Search(query, K):</span><br><span class="line">    entry = 顶层入口点</span><br><span class="line">    for layer = 顶层 to 1:</span><br><span class="line">        entry = GreedySearch(query, entry, layer)</span><br><span class="line">    candidates = SearchLayer(query, entry, ef, layer=0)</span><br><span class="line">    return Top-K of candidates</span><br></pre></td></tr></table></figure><ul><li><strong>GreedySearch</strong>：在当前层从入口点出发，每次移动到距离查询更近的邻居，直到局部最优</li><li><strong>ef</strong>：搜索宽度参数，ef 越大召回率越高但越慢</li></ul><h4 id="关键参数"><a href="#关键参数" class="headerlink" title="关键参数"></a>关键参数</h4><table><thead><tr><th>参数</th><th>含义</th><th>典型值</th></tr></thead><tbody><tr><td>$M$</td><td>非零层的最大连接数</td><td>16-64</td></tr><tr><td>$M_0$</td><td>第 0 层的最大连接数</td><td>2M</td></tr><tr><td>$ef_construction$</td><td>构建时的搜索宽度</td><td>200-400</td></tr><tr><td>$ef_search$</td><td>检索时的搜索宽度</td><td>50-200</td></tr></tbody></table><ul><li><strong>优点</strong>：检索速度极快（$O(\log N)$），召回率高，支持增量插入</li><li><strong>缺点</strong>：内存占用较大（需存储图结构），构建速度较慢</li><li><strong>适用</strong>：$10^5 \sim 10^9$ 规模，RAG 中最常用的索引</li></ul><h3 id="2-4-量化技术"><a href="#2-4-量化技术" class="headerlink" title="2.4 量化技术"></a>2.4 量化技术</h3><p>量化（Quantization）通过压缩向量表示来减少内存占用和加速计算，是大规模向量检索的必备技术。</p><h4 id="乘积量化（Product-Quantization-PQ）"><a href="#乘积量化（Product-Quantization-PQ）" class="headerlink" title="乘积量化（Product Quantization, PQ）"></a>乘积量化（Product Quantization, PQ）</h4><p>将 $d$ 维向量切分为 $m$ 个子向量，每个子向量独立量化：</p><p>$$\mathbf{v} &#x3D; [\underbrace{v_1, \dots, v_{d&#x2F;m}}<em>{\mathbf{v}^{(1)}}, \underbrace{v</em>{d&#x2F;m+1}, \dots v_{2d&#x2F;m}}<em>{\mathbf{v}^{(2)}}, \dots, \underbrace{v</em>{d-d&#x2F;m+1}, \dots, v_d}_{\mathbf{v}^{(m)}}]$$</p><p>每个子空间用 K-Means 聚为 $2^8 &#x3D; 256$ 个聚类中心（码本），向量编码为 $m$ 个 8-bit 码字。</p><ul><li><strong>压缩比</strong>：$d \times 4$ 字节（float32）→ $m$ 字节（$m$ 个 uint8），通常压缩 32-64 倍</li><li><strong>距离计算</strong>：使用查找表（Look-up Table）加速，避免解压缩</li></ul><h4 id="标量量化（Scalar-Quantization-SQ）"><a href="#标量量化（Scalar-Quantization-SQ）" class="headerlink" title="标量量化（Scalar Quantization, SQ）"></a>标量量化（Scalar Quantization, SQ）</h4><p>将每个浮点数直接量化为 8-bit 整数：</p><p>$$v_i^{\text{quant}} &#x3D; \text{round}\left(\frac{v_i - v_{\min}}{v_{\max} - v_{\min}} \times 255\right)$$</p><ul><li><strong>压缩比</strong>：4 倍（float32 → uint8）</li><li><strong>优点</strong>：实现简单，精度损失小</li><li><strong>缺点</strong>：压缩比不如 PQ</li></ul><h4 id="二值量化（Binary-Quantization-BQ）"><a href="#二值量化（Binary-Quantization-BQ）" class="headerlink" title="二值量化（Binary Quantization, BQ）"></a>二值量化（Binary Quantization, BQ）</h4><p>将每个维度量化为 1 bit（正为 1，负为 0），向量编码为位串：</p><p>$$v_i^{\text{binary}} &#x3D; \begin{cases} 1 &amp; \text{if } v_i &gt; 0 \ 0 &amp; \text{if } v_i \leq 0 \end{cases}$$</p><ul><li><strong>压缩比</strong>：32 倍（float32 → 1 bit）</li><li><strong>优点</strong>：极致压缩，用汉明距离计算极快</li><li><strong>缺点</strong>：精度损失大，需要重排序补偿</li></ul><h3 id="索引与量化的组合"><a href="#索引与量化的组合" class="headerlink" title="索引与量化的组合"></a>索引与量化的组合</h3><p>实际中常将索引结构与量化技术组合使用：</p><table><thead><tr><th>组合</th><th>描述</th><th>适用规模</th></tr></thead><tbody><tr><td><strong>IVF + PQ</strong></td><td>聚类 + 乘积量化</td><td>$10^7 \sim 10^9$</td></tr><tr><td><strong>HNSW + SQ</strong></td><td>图索引 + 标量量化</td><td>$10^6 \sim 10^8$</td></tr><tr><td><strong>HNSW + PQ</strong></td><td>图索引 + 乘积量化</td><td>$10^7 \sim 10^9$</td></tr><tr><td><strong>IVF + HNSW + PQ</strong></td><td>聚类 + 图 + 量化</td><td>$10^9$+</td></tr></tbody></table><hr><h2 id="三、主流向量数据库对比"><a href="#三、主流向量数据库对比" class="headerlink" title="三、主流向量数据库对比"></a>三、主流向量数据库对比</h2><h3 id="3-1-概览"><a href="#3-1-概览" class="headerlink" title="3.1 概览"></a>3.1 概览</h3><table><thead><tr><th>数据库</th><th>类型</th><th align="center">开源</th><th>索引</th><th>量化</th><th align="center">混合检索</th><th>适用规模</th><th>特色</th></tr></thead><tbody><tr><td><strong>Milvus</strong></td><td>专用</td><td align="center">✅</td><td>IVF&#x2F;HNSW&#x2F;DiskANN</td><td>PQ&#x2F;SQ&#x2F;BQ</td><td align="center">✅</td><td>亿级</td><td>功能最全，企业级</td></tr><tr><td><strong>Qdrant</strong></td><td>专用</td><td align="center">✅</td><td>HNSW</td><td>PQ&#x2F;SQ&#x2F;BQ</td><td align="center">✅</td><td>千万级</td><td>Rust 实现，性能优</td></tr><tr><td><strong>Weaviate</strong></td><td>专用</td><td align="center">✅</td><td>HNSW</td><td>PQ</td><td align="center">✅</td><td>千万级</td><td>内置模块化（向量+生成）</td></tr><tr><td><strong>Chroma</strong></td><td>轻量级</td><td align="center">✅</td><td>HNSW</td><td>—</td><td align="center">⚠️</td><td>百万级</td><td>极简 API，原型开发</td></tr><tr><td><strong>Pinecone</strong></td><td>托管</td><td align="center">❌</td><td>专有</td><td>专有</td><td align="center">✅</td><td>亿级</td><td>全托管，零运维</td></tr><tr><td><strong>pgvector</strong></td><td>扩展</td><td align="center">✅</td><td>IVF&#x2F;HNSW</td><td>—</td><td align="center">✅</td><td>百万级</td><td>PostgreSQL 扩展</td></tr><tr><td><strong>FAISS</strong></td><td>库</td><td align="center">✅</td><td>IVF&#x2F;HNSW&#x2F;…</td><td>PQ&#x2F;SQ&#x2F;…</td><td align="center">❌</td><td>亿级</td><td>Meta 出品，纯库</td></tr></tbody></table><h3 id="3-2-选型决策"><a href="#3-2-选型决策" class="headerlink" title="3.2 选型决策"></a>3.2 选型决策</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    Q[&quot;向量数据库选型&quot;] --&gt; S&#123;&quot;规模？&quot;&#125;</span><br><span class="line">    S --&gt;|&quot;原型/小规模&lt;br/&gt;&lt; 100K&quot;| CH[&quot;Chroma&lt;br/&gt;极简上手&quot;]</span><br><span class="line">    S --&gt;|&quot;中等规模&lt;br/&gt;100K - 10M&quot;| Q2&#123;&quot;需要混合检索？&quot;&#125;</span><br><span class="line">    S --&gt;|&quot;大规模&lt;br/&gt;10M - 1B&quot;| Q3&#123;&quot;自托管 or 托管？&quot;&#125;</span><br><span class="line">    S --&gt;|&quot;超大规模&lt;br/&gt;&gt; 1B&quot;| MIL[&quot;Milvus&lt;br/&gt;功能最全&quot;]</span><br><span class="line"></span><br><span class="line">    Q2 --&gt;|是| QD[&quot;Qdrant / Weaviate&quot;]</span><br><span class="line">    Q2 --&gt;|否| F[&quot;FAISS&lt;br/&gt;纯库最快&quot;]</span><br><span class="line"></span><br><span class="line">    Q3 --&gt;|自托管| QD2[&quot;Qdrant / Milvus&quot;]</span><br><span class="line">    Q3 --&gt;|托管| PIN[&quot;Pinecone&lt;br/&gt;零运维&quot;]</span><br></pre></td></tr></table></figure><h3 id="3-3-混合检索的支持"><a href="#3-3-混合检索的支持" class="headerlink" title="3.3 混合检索的支持"></a>3.3 混合检索的支持</h3><p>RAG 中混合检索（稀疏 + 稠密）越来越重要。各数据库的支持情况：</p><ul><li><strong>Milvus</strong>：2.4+ 原生支持稀疏向量字段 + 稠密向量字段，混合打分</li><li><strong>Qdrant</strong>：支持稀疏向量（Sparse Vectors），可做混合搜索</li><li><strong>Weaviate</strong>：支持 BM25 + 向量混合（Hybrid Search）</li><li><strong>pgvector</strong>：配合 PostgreSQL 全文搜索实现混合</li><li><strong>Chroma</strong>：不支持原生稀疏检索，需外部实现</li><li><strong>FAISS</strong>：纯向量库，不支持稀疏检索</li></ul><hr><h2 id="四、索引构建与维护"><a href="#四、索引构建与维护" class="headerlink" title="四、索引构建与维护"></a>四、索引构建与维护</h2><h3 id="4-1-构建策略"><a href="#4-1-构建策略" class="headerlink" title="4.1 构建策略"></a>4.1 构建策略</h3><table><thead><tr><th>策略</th><th>描述</th><th>适用场景</th></tr></thead><tbody><tr><td><strong>全量构建</strong></td><td>一次性对所有向量建索引</td><td>知识库不频繁更新</td></tr><tr><td><strong>增量插入</strong></td><td>逐条插入向量，实时更新索引</td><td>知识库持续更新</td></tr><tr><td><strong>批量重建</strong></td><td>积攒一批变更后重建索引</td><td>更新频率中等，追求索引质量</td></tr></tbody></table><p>HNSW 支持增量插入，但大量插入时索引质量不如全量构建（因为后续插入的节点只能连接到已有节点，无法”看到”尚未插入的节点）。</p><h3 id="4-2-索引参数调优"><a href="#4-2-索引参数调优" class="headerlink" title="4.2 索引参数调优"></a>4.2 索引参数调优</h3><p><strong>HNSW 调优</strong>：</p><table><thead><tr><th>参数</th><th>调优方向</th></tr></thead><tbody><tr><td>$M$</td><td>越大 → 召回率越高、内存越大、构建越慢。推荐 16-64</td></tr><tr><td>$ef_construction$</td><td>越大 → 构建质量越高、构建越慢。推荐 200-400</td></tr><tr><td>$ef_search$</td><td>越大 → 召回率越高、检索越慢。推荐 50-200</td></tr></tbody></table><p><strong>经验</strong>：先固定 $M&#x3D;32$，$ef_construction&#x3D;256$，然后调整 $ef_search$ 在速度和召回率之间权衡。</p><h3 id="4-3-分片与分布式"><a href="#4-3-分片与分布式" class="headerlink" title="4.3 分片与分布式"></a>4.3 分片与分布式</h3><p>当单机无法容纳所有向量时，需要分片（Sharding）：</p><ul><li><strong>按向量 ID 哈希分片</strong>：均匀分布，但每个查询需广播到所有分片</li><li><strong>按聚类分片</strong>：查询只需访问相关分片，减少计算量，但分布可能不均</li></ul><p>Milvus 和 Qdrant 都支持分布式部署和自动分片。</p><hr><h2 id="五、检索精度与速度的权衡"><a href="#五、检索精度与速度的权衡" class="headerlink" title="五、检索精度与速度的权衡"></a>五、检索精度与速度的权衡</h2><h3 id="5-1-Recall-vs-Latency-曲线"><a href="#5-1-Recall-vs-Latency-曲线" class="headerlink" title="5.1 Recall vs Latency 曲线"></a>5.1 Recall vs Latency 曲线</h3><p>对于任何 ANN 索引，召回率和延迟之间存在 trade-off：</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">Recall vs Latency 示意：</span><br><span class="line"></span><br><span class="line">Recall</span><br><span class="line">1.0 |          •••••</span><br><span class="line">    |       ••</span><br><span class="line">    |     •</span><br><span class="line">    |   •</span><br><span class="line">0.9 | •</span><br><span class="line">    |•</span><br><span class="line">    +----------→ Latency</span><br><span class="line">    快          慢</span><br></pre></td></tr></table></figure><p><strong>调优目标</strong>：在满足延迟要求的前提下最大化召回率。</p><h3 id="5-2-两阶段检索"><a href="#5-2-两阶段检索" class="headerlink" title="5.2 两阶段检索"></a>5.2 两阶段检索</h3><p>大规模场景下常用两阶段策略：</p><ol><li><strong>粗筛</strong>：用量化索引（如 PQ&#x2F;BQ）快速检索 Top-K’（K’ &gt;&gt; K）候选</li><li><strong>精排</strong>：对候选集用原始向量（或高精度量化）重计算精确距离，取 Top-K</li></ol><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">flowchart LR</span><br><span class="line">    Q[&quot;查询&quot;] --&gt; COARSE[&quot;粗筛&lt;br/&gt;量化索引&lt;br/&gt;Top-1000&quot;]</span><br><span class="line">    COARSE --&gt; RERANK[&quot;精排&lt;br/&gt;原始向量重算距离&lt;br/&gt;Top-10&quot;]</span><br><span class="line">    RERANK --&gt; RESULT[&quot;最终结果&quot;]</span><br></pre></td></tr></table></figure><p>这种方式在保持高召回率的同时大幅降低延迟。</p><hr><h2 id="六、小结"><a href="#六、小结" class="headerlink" title="六、小结"></a>六、小结</h2><p>向量存储与索引是 RAG 系统的”记忆系统”，决定了检索的规模上限和响应速度。本文的核心要点：</p><ul><li>精确搜索在大规模下不可行，ANN 是必需的妥协</li><li>HNSW 是当前综合最优的索引结构，$O(\log N)$ 检索复杂度</li><li>量化技术（PQ&#x2F;SQ&#x2F;BQ）大幅压缩内存，是十亿级检索的关键</li><li>向量数据库选型需考虑规模、混合检索需求、运维成本</li><li>两阶段检索（粗筛 + 精排）是大规模场景的最佳实践</li></ul><p><strong>下一篇</strong>，我们将聚焦检索策略——如何精准找到所需信息。</p><hr><p><strong>参考论文与资源</strong>：</p><ul><li>Malkov, Y.A., &amp; Yashunin, D.A. <em>Efficient and robust approximate nearest neighbor search using Hierarchical Navigable Small World graphs</em>. IEEE TPAMI 2018.</li><li>Jégou, H., et al. <em>Product Quantization for Nearest Neighbor Search</em>. IEEE TPAMI 2011.</li><li>Johnson, J., Douze, M., &amp; Jégou, H. <em>Billion-scale similarity search with GPUs</em>. IEEE TB 2021.</li><li>Milvus Documentation: <em>Index Types</em>.</li><li>Qdrant Documentation: <em>Indexing</em>.</li><li>Wang, J., et al. <em>A Comprehensive Survey on Vector Database</em>. arXiv 2024.</li></ul>]]>
+    </content>
+    <id>https://wswjcl.github.io/posts/b07fb9ab/</id>
+    <link href="https://wswjcl.github.io/posts/b07fb9ab/"/>
+    <published>2026-07-09T10:00:00.000Z</published>
+    <summary>深入讲解 RAG 中的向量存储与索引技术，涵盖 HNSW 原理、量化技术、主流向量数据库对比与选型。</summary>
+    <title>RAG 系列（四）：向量存储与索引 — 十亿级检索的幕后</title>
+    <updated>2026-07-10T01:12:48.669Z</updated>
+  </entry>
   <entry>
     <author>
       <name>Sugle</name>
@@ -25,7 +41,7 @@
     <published>2026-07-09T08:00:00.000Z</published>
     <summary>深入讲解 RAG 中的嵌入模型，涵盖主流模型对比、对比学习训练范式、语义空间与相似度度量、多语言嵌入等核心技术。</summary>
     <title>RAG 系列（三）：嵌入模型 — 让文本可计算</title>
-    <updated>2026-07-09T14:33:02.421Z</updated>
+    <updated>2026-07-10T01:12:48.669Z</updated>
   </entry>
   <entry>
     <author>
@@ -41,7 +57,7 @@
     <published>2026-07-09T06:00:00.000Z</published>
     <summary>深入讲解 RAG 系统中的文档解析与文本分块策略，涵盖固定大小分块、语义分块、递归分块等方法及 Chunk Size 权衡。</summary>
     <title>RAG 系列（二）：文档处理与分块 — RAG 的基石</title>
-    <updated>2026-07-09T14:33:02.421Z</updated>
+    <updated>2026-07-10T01:12:48.669Z</updated>
   </entry>
   <entry>
     <author>
@@ -57,7 +73,7 @@
     <published>2026-07-09T04:00:00.000Z</published>
     <summary>全面介绍 RAG（检索增强生成）的核心架构、演进路径与应用场景，开启 RAG 系列技术博客。</summary>
     <title>RAG 系列（一）：概述 — 从检索到生成的范式革命</title>
-    <updated>2026-07-09T14:33:02.421Z</updated>
+    <updated>2026-07-10T01:12:48.669Z</updated>
   </entry>
   <entry>
     <author>
@@ -73,7 +89,7 @@
     <published>2026-07-01T04:00:00.000Z</published>
     <summary>全面深入地讲解 Transformer 架构，涵盖 Self-Attention、Multi-Head Attention、位置编码、Encoder-Decoder 及主流变体。</summary>
     <title>Transformer 详解</title>
-    <updated>2026-07-09T14:33:02.421Z</updated>
+    <updated>2026-07-10T01:12:48.669Z</updated>
   </entry>
   <entry>
     <author>
@@ -89,7 +105,7 @@
     <published>2026-03-21T14:36:00.000Z</published>
     <summary>2025年是命运改变的节点，关于这一年的回顾与感悟。</summary>
     <title>2025-回顾</title>
-    <updated>2026-07-09T14:33:02.421Z</updated>
+    <updated>2026-07-10T01:12:48.669Z</updated>
   </entry>
   <entry>
     <author>
@@ -105,7 +121,7 @@
     <published>2025-06-30T16:00:00.000Z</published>
     <summary>一个比较奇怪的时刻，关于2025年7月的一些思考。</summary>
     <title>2025-7思考</title>
-    <updated>2026-07-09T14:33:02.421Z</updated>
+    <updated>2026-07-10T01:12:48.669Z</updated>
   </entry>
   <entry>
     <author>
@@ -121,7 +137,7 @@
     <published>2025-01-08T11:55:00.000Z</published>
     <summary>从&quot;最低限度&quot;的行动模式到重新思考为什么要全力以赴，一次自我反思的记录。</summary>
     <title>关于为什么要证明尽全力的思考</title>
-    <updated>2026-07-09T14:33:02.421Z</updated>
+    <updated>2026-07-10T01:12:48.669Z</updated>
   </entry>
   <entry>
     <author>
@@ -137,7 +153,7 @@
     <published>2025-01-05T18:56:00.000Z</published>
     <summary>记录博客搭建过程中的点滴，技术经验还在积累中，先水一篇。</summary>
     <title>水博客</title>
-    <updated>2026-07-09T14:33:02.421Z</updated>
+    <updated>2026-07-10T01:12:48.669Z</updated>
   </entry>
   <entry>
     <author>
@@ -153,7 +169,7 @@
     <published>2024-12-31T19:55:00.000Z</published>
     <summary>夜晚总会让人思考一些平常忽略的事情，关于2024年的烦恼与感悟。</summary>
     <title>2024-烦恼</title>
-    <updated>2026-07-09T14:33:02.421Z</updated>
+    <updated>2026-07-10T01:12:48.669Z</updated>
   </entry>
   <entry>
     <author>
@@ -171,6 +187,6 @@
     <title>
       <![CDATA[Hello life & Building a Blog]]>
     </title>
-    <updated>2026-07-09T14:33:02.421Z</updated>
+    <updated>2026-07-10T01:12:48.669Z</updated>
   </entry>
 </feed>
