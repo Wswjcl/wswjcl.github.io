@@ -10,7 +10,23 @@
   <rights>All rights reserved 2026, Sugle</rights>
   <subtitle>人生是旷野</subtitle>
   <title>Sugle's Blog</title>
-  <updated>2026-07-10T04:30:44.555Z</updated>
+  <updated>2026-07-13T13:25:48.035Z</updated>
+  <entry>
+    <author>
+      <name>Sugle</name>
+    </author>
+    <category term="技术" scheme="https://wswjcl.github.io/categories/%E6%8A%80%E6%9C%AF/"/>
+    <category term="AI工程" scheme="https://wswjcl.github.io/tags/AI%E5%B7%A5%E7%A8%8B/"/>
+    <content>
+      <![CDATA[<p>2025 年，AI 编程工具赛道爆发——Cursor、GitHub Copilot、Windsurf、Claude Code……各有各的打法。其中，Claude Code 选择了一条与众不同的路：<strong>它不是编辑器插件，而是一个活在终端里的 Agentic Coding 工具</strong>。</p><p>本系列将从架构视角深入解读 Claude Code 的设计哲学与实现机制。</p><hr><h2 id="一、Claude-Code-是什么？"><a href="#一、Claude-Code-是什么？" class="headerlink" title="一、Claude Code 是什么？"></a>一、Claude Code 是什么？</h2><p>Claude Code 是 Anthropic 推出的命令行 AI 编程助手。它的核心定位：</p><blockquote><p>An agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster by executing routine tasks, explaining complex code, and handling git workflows.</p></blockquote><p>关键词拆解：</p><ul><li><strong>Agentic</strong>：不是被动等指令的补全工具，而是能自主规划、执行、验证的代理</li><li><strong>In your terminal</strong>：运行在终端，不依赖任何 IDE</li><li><strong>Understands your codebase</strong>：能读取、搜索、理解整个项目</li><li><strong>Executes</strong>：不只是建议，而是直接执行——读文件、写代码、跑命令、推 Git</li></ul><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    subgraph 传统补全[&quot;传统补全工具（Copilot 等）&quot;]</span><br><span class="line">        U1[&quot;用户打字&quot;] --&gt; C1[&quot;模型补全下一行&quot;] --&gt; A1[&quot;用户决定是否接受&quot;]</span><br><span class="line">    end</span><br><span class="line"></span><br><span class="line">    subgraph Agentic[&quot;Agentic 工具（Claude Code）&quot;]</span><br><span class="line">        U2[&quot;用户描述目标&quot;] --&gt; P[&quot;模型规划步骤&quot;]</span><br><span class="line">        P --&gt; T1[&quot;工具执行: 读文件&quot;]</span><br><span class="line">        T1 --&gt; T2[&quot;工具执行: 搜索代码&quot;]</span><br><span class="line">        T2 --&gt; T3[&quot;工具执行: 编辑文件&quot;]</span><br><span class="line">        T3 --&gt; T4[&quot;工具执行: 运行测试&quot;]</span><br><span class="line">        T4 --&gt; V[&quot;验证结果&quot;]</span><br><span class="line">        V --&gt;|&quot;未完成&quot;| P</span><br><span class="line">        V --&gt;|&quot;完成&quot;| R[&quot;交付结果&quot;]</span><br><span class="line">    end</span><br></pre></td></tr></table></figure><p>从”逐行补全”到”目标驱动”，这是编程辅助范式的根本转变。</p><hr><h2 id="二、与同类工具的定位差异"><a href="#二、与同类工具的定位差异" class="headerlink" title="二、与同类工具的定位差异"></a>二、与同类工具的定位差异</h2><table><thead><tr><th>维度</th><th align="center">GitHub Copilot</th><th align="center">Cursor</th><th align="center">Claude Code</th></tr></thead><tbody><tr><td><strong>形态</strong></td><td align="center">IDE 插件</td><td align="center">独立 IDE（Fork VS Code）</td><td align="center">终端 CLI</td></tr><tr><td><strong>交互模式</strong></td><td align="center">行内补全 + Chat</td><td align="center">行内补全 + Chat + Agent</td><td align="center">纯 Agent 对话</td></tr><tr><td><strong>执行能力</strong></td><td align="center">❌ 仅建议</td><td align="center">⚠️ 有限（Agent 模式）</td><td align="center">✅ 完整（读&#x2F;写&#x2F;执行&#x2F;Git）</td></tr><tr><td><strong>代码理解范围</strong></td><td align="center">当前文件为主</td><td align="center">项目级</td><td align="center">项目级 + 全局搜索</td></tr><tr><td><strong>工具数量</strong></td><td align="center">少</td><td align="center">中</td><td align="center">30+ 内置 + MCP 无限扩展</td></tr><tr><td><strong>多 Agent</strong></td><td align="center">❌</td><td align="center">⚠️ 有限</td><td align="center">✅ 四层 Agent 架构</td></tr><tr><td><strong>权限控制</strong></td><td align="center">无需（不执行）</td><td align="center">基础</td><td align="center">五级权限 + 沙箱 + Hook</td></tr><tr><td><strong>扩展方式</strong></td><td align="center">有限</td><td align="center">扩展市场</td><td align="center">MCP + 插件 + Hook + Agent</td></tr><tr><td><strong>IDE 依赖</strong></td><td align="center">强（VS Code 等）</td><td align="center">强（自身即 IDE）</td><td align="center">❌ 无（纯终端）</td></tr></tbody></table><p>Claude Code 的核心差异在于<strong>执行能力</strong>和<strong>无 IDE 依赖</strong>：</p><ol><li><strong>执行能力</strong>：它不是在”建议”你做什么，而是在”做”——直接读写文件、运行命令、操作 Git。这带来了效率的质变，也带来了安全挑战。</li><li><strong>无 IDE 依赖</strong>：终端是程序员最通用的环境。不需要 VS Code，不需要任何特定 IDE，SSH 到远程服务器也能用。</li></ol><hr><h2 id="三、核心架构：Agentic-Loop"><a href="#三、核心架构：Agentic-Loop" class="headerlink" title="三、核心架构：Agentic Loop"></a>三、核心架构：Agentic Loop</h2><p>Claude Code 的核心是一个<strong>Agentic Loop（代理循环）</strong>，不断在三个阶段间循环：</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    START[&quot;用户输入&quot;] --&gt; GATHER[&quot;收集上下文&lt;br/&gt;Gather Context&quot;]</span><br><span class="line">    GATHER --&gt; ACT[&quot;执行动作&lt;br/&gt;Take Action&quot;]</span><br><span class="line">    ACT --&gt; VERIFY[&quot;验证结果&lt;br/&gt;Verify Results&quot;]</span><br><span class="line">    VERIFY --&gt;|&quot;需要继续&quot;| GATHER</span><br><span class="line">    VERIFY --&gt;|&quot;任务完成&quot;| END[&quot;交付结果&quot;]</span><br><span class="line"></span><br><span class="line">    GATHER -.-&gt;|&quot;读取文件&lt;br/&gt;搜索代码&lt;br/&gt;加载 CLAUDE.md&quot;| TOOLS1[&quot;工具: Read / Glob / Grep&quot;]</span><br><span class="line">    ACT -.-&gt;|&quot;编辑文件&lt;br/&gt;运行命令&lt;br/&gt;创建子代理&quot;| TOOLS2[&quot;工具: Edit / Write / Bash / Agent&quot;]</span><br><span class="line">    VERIFY -.-&gt;|&quot;运行测试&lt;br/&gt;检查输出&lt;br/&gt;确认变更&quot;| TOOLS3[&quot;工具: Bash / Read / Grep&quot;]</span><br></pre></td></tr></table></figure><h3 id="3-1-Harness-概念"><a href="#3-1-Harness-概念" class="headerlink" title="3.1 Harness 概念"></a>3.1 Harness 概念</h3><p>Claude Code 是围绕 Claude 模型构建的 <strong>Harness（框架&#x2F;线束）</strong>。模型负责推理，Harness 负责执行：</p><table><thead><tr><th>职责</th><th align="center">模型（Claude）</th><th align="center">Harness（Claude Code）</th></tr></thead><tbody><tr><td>理解用户意图</td><td align="center">✅</td><td align="center"></td></tr><tr><td>选择使用哪个工具</td><td align="center">✅</td><td align="center"></td></tr><tr><td>构造工具参数</td><td align="center">✅</td><td align="center"></td></tr><tr><td>执行工具</td><td align="center"></td><td align="center">✅</td></tr><tr><td>管理上下文窗口</td><td align="center"></td><td align="center">✅</td></tr><tr><td>权限检查</td><td align="center"></td><td align="center">✅</td></tr><tr><td>沙箱隔离</td><td align="center"></td><td align="center">✅</td></tr><tr><td>结果格式化</td><td align="center"></td><td align="center">✅</td></tr><tr><td>判断任务是否完成</td><td align="center">✅</td><td align="center"></td></tr></tbody></table><p>模型是”大脑”，Harness 是”手和眼”。这种分离使得：</p><ul><li>模型升级时，Harness 不变</li><li>新工具加入时，模型自动学会使用（通过工具描述）</li><li>安全策略在 Harness 层执行，模型无法绕过</li></ul><h3 id="3-2-循环的详细流程"><a href="#3-2-循环的详细流程" class="headerlink" title="3.2 循环的详细流程"></a>3.2 循环的详细流程</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">1. 用户输入 → 追加到对话历史</span><br><span class="line">2. 构造 Prompt:</span><br><span class="line">     系统指令 + CLAUDE.md + Auto Memory + 对话历史 + 工具定义</span><br><span class="line">3. 调用 Claude API → 模型返回文本或工具调用</span><br><span class="line">4. 如果是工具调用:</span><br><span class="line">     a. 权限检查（根据当前模式）</span><br><span class="line">     b. 执行工具（可能需要用户确认）</span><br><span class="line">     c. 将工具结果追加到对话历史</span><br><span class="line">     d. 回到步骤 2（继续循环）</span><br><span class="line">5. 如果是纯文本:</span><br><span class="line">     展示给用户 → 等待用户下一轮输入</span><br></pre></td></tr></table></figure><hr><h2 id="四、分发架构：从-npm-到原生二进制"><a href="#四、分发架构：从-npm-到原生二进制" class="headerlink" title="四、分发架构：从 npm 到原生二进制"></a>四、分发架构：从 npm 到原生二进制</h2><p>Claude Code 的分发方式颇为独特——它是一个<strong>编译为原生二进制的 TypeScript 应用</strong>。</p><h3 id="4-1-Node-js-SEA（Single-Executable-Application）"><a href="#4-1-Node-js-SEA（Single-Executable-Application）" class="headerlink" title="4.1 Node.js SEA（Single Executable Application）"></a>4.1 Node.js SEA（Single Executable Application）</h3><p>Claude Code 使用 Node.js 的 SEA 能力，将整个应用（Node.js 运行时 + 应用代码）打包为单个原生二进制文件：</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    SRC[&quot;TypeScript 源码&quot;] --&gt; BUNDLE[&quot;打包为单 JS 文件&quot;]</span><br><span class="line">    BUNDLE --&gt; SEA[&quot;Node.js SEA 封装&quot;]</span><br><span class="line">    SEA --&gt; BIN[&quot;原生二进制&lt;br/&gt;~241MB per platform&quot;]</span><br><span class="line"></span><br><span class="line">    BIN --&gt; MAC_ARM[&quot;claude-code-darwin-arm64&quot;]</span><br><span class="line">    BIN --&gt; MAC_X64[&quot;claude-code-darwin-x64&quot;]</span><br><span class="line">    BIN --&gt; LIN_X64[&quot;claude-code-linux-x64&quot;]</span><br><span class="line">    BIN --&gt; WIN_X64[&quot;claude-code-win32-x64&quot;]</span><br><span class="line">    BIN --&gt; MORE[&quot;...共 10 个平台&quot;]</span><br></pre></td></tr></table></figure><h3 id="4-2-npm-多包分发"><a href="#4-2-npm-多包分发" class="headerlink" title="4.2 npm 多包分发"></a>4.2 npm 多包分发</h3><p>主包 <code>@anthropic-ai/claude-code</code> 是一个轻量 wrapper（157KB），它的 <code>postinstall</code> 脚本：</p><ol><li>检测当前平台（OS + CPU + libc 变体）</li><li>安装对应的平台特定包（optional dependency）</li><li>将二进制文件复制&#x2F;硬链接到 <code>bin/claude.exe</code></li></ol><p>这意味着 <code>npm install -g @anthropic-ai/claude-code</code> 会自动选择正确的二进制。</p><h3 id="4-3-为什么选择-SEA？"><a href="#4-3-为什么选择-SEA？" class="headerlink" title="4.3 为什么选择 SEA？"></a>4.3 为什么选择 SEA？</h3><ul><li><strong>零依赖</strong>：用户不需要安装 Node.js（虽然目前仍要求 Node &gt;&#x3D; 22，但未来可能完全独立）</li><li><strong>单文件分发</strong>：没有 node_modules，没有路径问题</li><li><strong>启动快</strong>：省去模块解析的开销</li><li><strong>保护源码</strong>：编译为二进制后，源码不易被直接阅读</li></ul><hr><h2 id="五、源码可及性：如何在不开源的情况下理解架构"><a href="#五、源码可及性：如何在不开源的情况下理解架构" class="headerlink" title="五、源码可及性：如何在不开源的情况下理解架构"></a>五、源码可及性：如何在不开源的情况下理解架构</h2><h3 id="5-1-源码状态"><a href="#5-1-源码状态" class="headerlink" title="5.1 源码状态"></a>5.1 源码状态</h3><p>Claude Code 的核心源码<strong>未开源</strong>。GitHub 仓库 <code>anthropics/claude-code</code> 只包含：</p><ul><li>文档和示例</li><li>插件和 Agent 定义</li><li>Hook 配置示例</li><li>SDK 类型定义</li></ul><h3 id="5-2-逆向理解的途径"><a href="#5-2-逆向理解的途径" class="headerlink" title="5.2 逆向理解的途径"></a>5.2 逆向理解的途径</h3><table><thead><tr><th>途径</th><th align="center">信息量</th><th align="center">可靠性</th></tr></thead><tbody><tr><td><strong>sdk-tools.d.ts</strong></td><td align="center">⭐⭐⭐⭐⭐</td><td align="center">⭐⭐⭐⭐⭐</td></tr><tr><td><strong>官方文档</strong></td><td align="center">⭐⭐⭐⭐</td><td align="center">⭐⭐⭐⭐⭐</td></tr><tr><td><strong>插件源码</strong></td><td align="center">⭐⭐⭐</td><td align="center">⭐⭐⭐⭐⭐</td></tr><tr><td><strong>运行时行为</strong></td><td align="center">⭐⭐⭐⭐</td><td align="center">⭐⭐⭐</td></tr><tr><td><strong>二进制逆向</strong></td><td align="center">⭐⭐⭐⭐⭐</td><td align="center">⭐⭐</td></tr></tbody></table><p><strong>sdk-tools.d.ts 是最宝贵的资源</strong>——3556 行的 TypeScript 类型定义，完整暴露了 30+ 工具的输入输出接口。通过类型定义，我们可以推断：</p><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 从类型定义推断工具设计</span></span><br><span class="line"><span class="keyword">interface</span> <span class="title class_">BashInput</span> &#123;</span><br><span class="line">  <span class="attr">command</span>: <span class="built_in">string</span>                    <span class="comment">// 要执行的命令</span></span><br><span class="line">  <span class="attr">timeout</span>?: <span class="built_in">number</span>                   <span class="comment">// 超时时间 → 说明有超时机制</span></span><br><span class="line">  <span class="attr">description</span>?: <span class="built_in">string</span>               <span class="comment">// 命令描述 → 用于权限提示</span></span><br><span class="line">  <span class="attr">run_in_background</span>?: <span class="built_in">boolean</span>        <span class="comment">// 后台运行 → 说明支持异步执行</span></span><br><span class="line">  <span class="attr">dangerouslyDisableSandbox</span>?: <span class="built_in">boolean</span> <span class="comment">// 禁用沙箱 → 说明有沙箱机制</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">interface</span> <span class="title class_">AgentInput</span> &#123;</span><br><span class="line">  <span class="attr">description</span>: <span class="built_in">string</span>                <span class="comment">// 子代理描述</span></span><br><span class="line">  <span class="attr">prompt</span>: <span class="built_in">string</span>                     <span class="comment">// 子代理的 Prompt</span></span><br><span class="line">  <span class="attr">subagent_type</span>?: <span class="built_in">string</span>             <span class="comment">// 代理类型 → 说明有预定义的代理类型</span></span><br><span class="line">  <span class="attr">model</span>?: <span class="built_in">string</span>                     <span class="comment">// 模型选择 → 说明子代理可用不同模型</span></span><br><span class="line">  <span class="attr">run_in_background</span>?: <span class="built_in">boolean</span>        <span class="comment">// 后台运行</span></span><br><span class="line">  <span class="attr">name</span>?: <span class="built_in">string</span>                      <span class="comment">// 代理名称</span></span><br><span class="line">  <span class="attr">mode</span>?: <span class="built_in">string</span>                      <span class="comment">// 运行模式</span></span><br><span class="line">  <span class="attr">isolation</span>?: <span class="built_in">string</span>                 <span class="comment">// 隔离方式（worktree/remote）</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>从接口定义就能读出设计意图：<code>Bash</code> 有沙箱和超时 → 安全优先；<code>Agent</code> 有隔离方式 → 支持并行开发不冲突。</p><h3 id="5-3-本系列的解读方法"><a href="#5-3-本系列的解读方法" class="headerlink" title="5.3 本系列的解读方法"></a>5.3 本系列的解读方法</h3><p>本系列采用<strong>架构逆向工程</strong>的方法：</p><ol><li><strong>从接口推断实现</strong>：类型定义 → 设计模式 → 实现推测</li><li><strong>从文档验证推断</strong>：官方文档描述 → 与类型定义交叉验证</li><li><strong>从行为观察机制</strong>：实际使用中的行为 → 推断内部机制</li><li><strong>从插件理解扩展点</strong>：开源插件 → 理解框架的扩展接口</li></ol><hr><h2 id="六、Claude-Code-的设计哲学"><a href="#六、Claude-Code-的设计哲学" class="headerlink" title="六、Claude Code 的设计哲学"></a>六、Claude Code 的设计哲学</h2><p>从架构中可以读出几个清晰的设计哲学：</p><h3 id="6-1-安全优先，能力其次"><a href="#6-1-安全优先，能力其次" class="headerlink" title="6.1 安全优先，能力其次"></a>6.1 安全优先，能力其次</h3><ul><li>五级权限模式，从手动确认到全自动</li><li>OS 级沙箱隔离，防止命令越权</li><li>Auto 模式用独立分类器审查，且分类器<strong>不看工具输出</strong>（防注入）</li><li>Hook 系统允许在任意生命周期点拦截</li></ul><h3 id="6-2-组合优于继承"><a href="#6-2-组合优于继承" class="headerlink" title="6.2 组合优于继承"></a>6.2 组合优于继承</h3><ul><li>30+ 原子工具，通过组合实现复杂任务</li><li>Agent 系统四层架构，每层都是独立可组合的</li><li>MCP 协议让外部工具无缝接入</li><li>插件系统：commands + agents + skills + hooks + mcp，各司其职</li></ul><h3 id="6-3-上下文是第一公民"><a href="#6-3-上下文是第一公民" class="headerlink" title="6.3 上下文是第一公民"></a>6.3 上下文是第一公民</h3><ul><li>CLAUDE.md 三级体系（项目&#x2F;用户&#x2F;托管）</li><li>Auto Memory 自动学习并持久化</li><li>压缩策略精心设计：保留什么、丢弃什么、何时触发</li><li>Prompt Caching 减少重复计算</li></ul><h3 id="6-4-开放扩展，封闭修改"><a href="#6-4-开放扩展，封闭修改" class="headerlink" title="6.4 开放扩展，封闭修改"></a>6.4 开放扩展，封闭修改</h3><ul><li>MCP 协议：任何语言的服务都能接入</li><li>插件系统：社区可以贡献新能力</li><li>Hook 系统：不改源码就能改变行为</li><li>Agent 定义：用 Markdown 就能创建新代理</li></ul><hr><h2 id="七、系列文章导读"><a href="#七、系列文章导读" class="headerlink" title="七、系列文章导读"></a>七、系列文章导读</h2><table><thead><tr><th>篇目</th><th>主题</th><th>核心内容</th></tr></thead><tbody><tr><td><strong>第二篇</strong></td><td>Agentic Loop</td><td>核心循环、Harness 概念、会话生命周期</td></tr><tr><td><strong>第三篇</strong></td><td>工具系统</td><td>30+ 工具分类、sdk-tools.d.ts 逆向、关键工具深度解析</td></tr><tr><td><strong>第四篇</strong></td><td>Agent 系统</td><td>四层 Agent 架构、子代理、团队协作、Dynamic Workflows</td></tr><tr><td><strong>第五篇</strong></td><td>上下文管理</td><td>压缩策略、CLAUDE.md 体系、Auto Memory、Checkpointing</td></tr><tr><td><strong>第六篇</strong></td><td>权限与安全</td><td>五级权限、沙箱、Auto 分类器、Hook 系统</td></tr><tr><td><strong>第七篇</strong></td><td>MCP 与插件</td><td>MCP 集成、插件架构、开源插件分析、设计哲学总结</td></tr></tbody></table><hr><p><strong>参考资源</strong>：</p><ul><li><a href="https://code.claude.com/docs/en/overview">Claude Code 官方文档</a></li><li><a href="https://github.com/anthropics/claude-code">Claude Code GitHub 仓库</a></li><li><a href="https://www.npmjs.com/package/@anthropic-ai/claude-code">Claude Code npm 包</a></li><li><a href="https://modelcontextprotocol.io/">Model Context Protocol 规范</a></li></ul>]]>
+    </content>
+    <id>https://wswjcl.github.io/posts/a0e2fc71/</id>
+    <link href="https://wswjcl.github.io/posts/a0e2fc71/"/>
+    <published>2026-07-11T02:00:00.000Z</published>
+    <summary>从架构视角深入解读 Claude Code，分析其 Agentic Loop 设计、与同类工具的差异、分发架构，以及如何在源码未开源的情况下逆向理解其设计。</summary>
+    <title>Claude Code 源码解读（一）：概述 — 一个 Agentic Coding 工具的诞生</title>
+    <updated>2026-07-13T13:25:48.035Z</updated>
+  </entry>
   <entry>
     <author>
       <name>Sugle</name>
@@ -25,7 +41,7 @@
     <published>2026-07-10T06:00:00.000Z</published>
     <summary>深入讲解 RAG 的评估框架与优化方向，涵盖 RAGAS 指标体系、端到端与组件级评估，以及 GraphRAG、Self-RAG 等前沿趋势。</summary>
     <title>RAG 系列（七）：评估与优化 — 闭环提升</title>
-    <updated>2026-07-10T04:30:44.555Z</updated>
+    <updated>2026-07-13T13:25:48.035Z</updated>
   </entry>
   <entry>
     <author>
@@ -41,7 +57,7 @@
     <published>2026-07-10T04:00:00.000Z</published>
     <summary>深入讲解 RAG 中的重排序与上下文整合技术，涵盖交叉编码器 Reranker、LLM-based Reranker、Lost in the Middle 问题与 Prompt 工程策略。</summary>
     <title>RAG 系列（六）：重排序与上下文整合 — 最后的精炼</title>
-    <updated>2026-07-10T04:30:44.555Z</updated>
+    <updated>2026-07-13T13:25:48.035Z</updated>
   </entry>
   <entry>
     <author>
@@ -57,7 +73,7 @@
     <published>2026-07-10T02:00:00.000Z</published>
     <summary>深入讲解 RAG 中的检索策略，涵盖稀疏检索 BM25、稠密检索 DPR、混合检索、查询改写与多跳检索等核心技术。</summary>
     <title>RAG 系列（五）：检索策略 — 精准找到所需信息</title>
-    <updated>2026-07-10T04:30:44.555Z</updated>
+    <updated>2026-07-13T13:25:48.035Z</updated>
   </entry>
   <entry>
     <author>
@@ -73,7 +89,7 @@
     <published>2026-07-09T10:00:00.000Z</published>
     <summary>深入讲解 RAG 中的向量存储与索引技术，涵盖 HNSW 原理、量化技术、主流向量数据库对比与选型。</summary>
     <title>RAG 系列（四）：向量存储与索引 — 十亿级检索的幕后</title>
-    <updated>2026-07-10T04:30:44.555Z</updated>
+    <updated>2026-07-13T13:25:48.035Z</updated>
   </entry>
   <entry>
     <author>
@@ -89,7 +105,7 @@
     <published>2026-07-09T08:00:00.000Z</published>
     <summary>深入讲解 RAG 中的嵌入模型，涵盖主流模型对比、对比学习训练范式、语义空间与相似度度量、多语言嵌入等核心技术。</summary>
     <title>RAG 系列（三）：嵌入模型 — 让文本可计算</title>
-    <updated>2026-07-10T04:30:44.555Z</updated>
+    <updated>2026-07-13T13:25:48.035Z</updated>
   </entry>
   <entry>
     <author>
@@ -105,7 +121,7 @@
     <published>2026-07-09T06:00:00.000Z</published>
     <summary>深入讲解 RAG 系统中的文档解析与文本分块策略，涵盖固定大小分块、语义分块、递归分块等方法及 Chunk Size 权衡。</summary>
     <title>RAG 系列（二）：文档处理与分块 — RAG 的基石</title>
-    <updated>2026-07-10T04:30:44.555Z</updated>
+    <updated>2026-07-13T13:25:48.035Z</updated>
   </entry>
   <entry>
     <author>
@@ -121,7 +137,7 @@
     <published>2026-07-09T04:00:00.000Z</published>
     <summary>全面介绍 RAG（检索增强生成）的核心架构、演进路径与应用场景，开启 RAG 系列技术博客。</summary>
     <title>RAG 系列（一）：概述 — 从检索到生成的范式革命</title>
-    <updated>2026-07-10T04:30:44.555Z</updated>
+    <updated>2026-07-13T13:25:48.035Z</updated>
   </entry>
   <entry>
     <author>
@@ -137,7 +153,7 @@
     <published>2026-07-01T04:00:00.000Z</published>
     <summary>全面深入地讲解 Transformer 架构，涵盖 Self-Attention、Multi-Head Attention、位置编码、Encoder-Decoder 及主流变体。</summary>
     <title>Transformer 详解</title>
-    <updated>2026-07-10T04:30:44.555Z</updated>
+    <updated>2026-07-13T13:25:48.035Z</updated>
   </entry>
   <entry>
     <author>
@@ -153,7 +169,7 @@
     <published>2026-03-21T14:36:00.000Z</published>
     <summary>2025年是命运改变的节点，关于这一年的回顾与感悟。</summary>
     <title>2025-回顾</title>
-    <updated>2026-07-10T04:30:44.555Z</updated>
+    <updated>2026-07-13T13:25:48.035Z</updated>
   </entry>
   <entry>
     <author>
@@ -169,7 +185,7 @@
     <published>2025-06-30T16:00:00.000Z</published>
     <summary>一个比较奇怪的时刻，关于2025年7月的一些思考。</summary>
     <title>2025-7思考</title>
-    <updated>2026-07-10T04:30:44.555Z</updated>
+    <updated>2026-07-13T13:25:48.035Z</updated>
   </entry>
   <entry>
     <author>
@@ -185,7 +201,7 @@
     <published>2025-01-08T11:55:00.000Z</published>
     <summary>从&quot;最低限度&quot;的行动模式到重新思考为什么要全力以赴，一次自我反思的记录。</summary>
     <title>关于为什么要证明尽全力的思考</title>
-    <updated>2026-07-10T04:30:44.555Z</updated>
+    <updated>2026-07-13T13:25:48.035Z</updated>
   </entry>
   <entry>
     <author>
@@ -201,7 +217,7 @@
     <published>2025-01-05T18:56:00.000Z</published>
     <summary>记录博客搭建过程中的点滴，技术经验还在积累中，先水一篇。</summary>
     <title>水博客</title>
-    <updated>2026-07-10T04:30:44.555Z</updated>
+    <updated>2026-07-13T13:25:48.035Z</updated>
   </entry>
   <entry>
     <author>
@@ -217,7 +233,7 @@
     <published>2024-12-31T19:55:00.000Z</published>
     <summary>夜晚总会让人思考一些平常忽略的事情，关于2024年的烦恼与感悟。</summary>
     <title>2024-烦恼</title>
-    <updated>2026-07-10T04:30:44.555Z</updated>
+    <updated>2026-07-13T13:25:48.035Z</updated>
   </entry>
   <entry>
     <author>
@@ -235,6 +251,6 @@
     <title>
       <![CDATA[Hello life & Building a Blog]]>
     </title>
-    <updated>2026-07-10T04:30:44.555Z</updated>
+    <updated>2026-07-13T13:25:48.035Z</updated>
   </entry>
 </feed>

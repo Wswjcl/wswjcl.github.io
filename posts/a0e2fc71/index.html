@@ -1,0 +1,658 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>Claude Code 源码解读（一）：概述 — 一个 Agentic Coding 工具的诞生 | Sugle's Blog</title><meta name="author" content="Sugle"><meta name="copyright" content="Sugle"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="从架构视角深入解读 Claude Code，分析其 Agentic Loop 设计、与同类工具的差异、分发架构，以及如何在源码未开源的情况下逆向理解其设计。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Claude Code 源码解读（一）：概述 — 一个 Agentic Coding 工具的诞生">
+<meta property="og:url" content="https://wswjcl.github.io/posts/a0e2fc71/">
+<meta property="og:site_name" content="Sugle&#39;s Blog">
+<meta property="og:description" content="从架构视角深入解读 Claude Code，分析其 Agentic Loop 设计、与同类工具的差异、分发架构，以及如何在源码未开源的情况下逆向理解其设计。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://wswjcl.github.io/img/default_cover.png">
+<meta property="article:published_time" content="2026-07-11T02:00:00.000Z">
+<meta property="article:modified_time" content="2026-07-13T13:25:48.035Z">
+<meta property="article:author" content="Sugle">
+<meta property="article:tag" content="AI工程">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://wswjcl.github.io/img/default_cover.png"><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://wswjcl.github.io/posts/a0e2fc71/"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=5.2.2"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.6.0/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!true && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.json","preload":true,"top_n_per_article":1,"unescape":false,"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":true,"highlightMacStyle":true},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'medium_zoom',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.12.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyload: true,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'Claude Code 源码解读（一）：概述 — 一个 Agentic Coding 工具的诞生',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  isShuoshuo: false
+}</script><style>
+/* 搜索弹窗美化 */
+.search-dialog {
+  border-radius: 16px !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,.15), 0 0 0 1px rgba(0,0,0,.05) !important;
+  overflow: hidden;
+  animation: searchSlideIn .35s cubic-bezier(.22,1,.36,1) !important;
+}
+@keyframes searchSlideIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(20px) scale(.96); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+.search-nav {
+  padding: 16px 20px !important;
+  border-bottom: 1px solid var(--search-border, rgba(0,0,0,.06));
+}
+.search-dialog-title {
+  font-size: 1.1em !important;
+  font-weight: 600 !important;
+}
+.search-close-button {
+  width: 32px; height: 32px;
+  border-radius: 8px !important;
+  transition: background .2s, transform .15s !important;
+}
+.search-close-button:hover {
+  background: rgba(0,0,0,.06) !important;
+  transform: scale(1.1);
+}
+.local-search-box--input {
+  border-radius: 12px !important;
+  border: 2px solid var(--search-color) !important;
+  padding: 10px 18px !important;
+  font-size: .95em !important;
+  transition: box-shadow .25s, border-color .25s !important;
+}
+.local-search-box--input:focus {
+  box-shadow: 0 0 0 3px rgba(73,177,245,.25) !important;
+}
+.search-result-list {
+  padding: 4px 8px !important;
+}
+.local-search-hit-item {
+  padding: 12px 14px !important;
+  border-radius: 10px !important;
+  margin-bottom: 6px !important;
+  transition: background .2s !important;
+}
+.local-search-hit-item:hover {
+  background: rgba(73,177,245,.07) !important;
+}
+.search-result-title {
+  font-size: 1em !important;
+}
+.search-result {
+  line-height: 1.6 !important;
+}
+.search-keyword {
+  border-radius: 3px !important;
+  padding: 1px 4px !important;
+}
+#search-mask {
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+}
+/* 暗色模式适配 */
+[data-theme="dark"] .search-dialog {
+  box-shadow: 0 20px 60px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05) !important;
+}
+[data-theme="dark"] .search-close-button:hover {
+  background: rgba(255,255,255,.1) !important;
+}
+[data-theme="dark"] .local-search-hit-item:hover {
+  background: rgba(73,177,245,.12) !important;
+}
+</style>
+<link rel="alternate" href="/atom.xml" title="Sugle's Blog" type="application/atom+xml">
+</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src= "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-lazy-src="/img/head.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">15</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">4</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">4</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fa fa-archive"></i><span> Archives</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-th"></i><span> Categories</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> Tags</span></a></div><div class="menus_item"><a class="site-page" href="/now/"><i class="fa-fw fas fa-bolt"></i><span> Now</span></a></div><div class="menus_item"><a class="site-page" href="/music/"><i class="fa-fw fas fa-music"></i><span> Music</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> About</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url(/img/default_cover.png);"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">Sugle's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">Claude Code 源码解读（一）：概述 — 一个 Agentic Coding 工具的诞生</span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fa fa-archive"></i><span> Archives</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-th"></i><span> Categories</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> Tags</span></a></div><div class="menus_item"><a class="site-page" href="/now/"><i class="fa-fw fas fa-bolt"></i><span> Now</span></a></div><div class="menus_item"><a class="site-page" href="/music/"><i class="fa-fw fas fa-music"></i><span> Music</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> About</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">Claude Code 源码解读（一）：概述 — 一个 Agentic Coding 工具的诞生</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-07-11T02:00:00.000Z" title="发表于 2026-07-11 10:00:00">2026-07-11</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-07-13T13:25:48.035Z" title="更新于 2026-07-13 21:25:48">2026-07-13</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E6%8A%80%E6%9C%AF/">技术</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><p>2025 年，AI 编程工具赛道爆发——Cursor、GitHub Copilot、Windsurf、Claude Code……各有各的打法。其中，Claude Code 选择了一条与众不同的路：<strong>它不是编辑器插件，而是一个活在终端里的 Agentic Coding 工具</strong>。</p>
+<p>本系列将从架构视角深入解读 Claude Code 的设计哲学与实现机制。</p>
+<hr>
+<h2 id="一、Claude-Code-是什么？"><a href="#一、Claude-Code-是什么？" class="headerlink" title="一、Claude Code 是什么？"></a>一、Claude Code 是什么？</h2><p>Claude Code 是 Anthropic 推出的命令行 AI 编程助手。它的核心定位：</p>
+<blockquote>
+<p>An agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster by executing routine tasks, explaining complex code, and handling git workflows.</p>
+</blockquote>
+<p>关键词拆解：</p>
+<ul>
+<li><strong>Agentic</strong>：不是被动等指令的补全工具，而是能自主规划、执行、验证的代理</li>
+<li><strong>In your terminal</strong>：运行在终端，不依赖任何 IDE</li>
+<li><strong>Understands your codebase</strong>：能读取、搜索、理解整个项目</li>
+<li><strong>Executes</strong>：不只是建议，而是直接执行——读文件、写代码、跑命令、推 Git</li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    subgraph 传统补全[&quot;传统补全工具（Copilot 等）&quot;]</span><br><span class="line">        U1[&quot;用户打字&quot;] --&gt; C1[&quot;模型补全下一行&quot;] --&gt; A1[&quot;用户决定是否接受&quot;]</span><br><span class="line">    end</span><br><span class="line"></span><br><span class="line">    subgraph Agentic[&quot;Agentic 工具（Claude Code）&quot;]</span><br><span class="line">        U2[&quot;用户描述目标&quot;] --&gt; P[&quot;模型规划步骤&quot;]</span><br><span class="line">        P --&gt; T1[&quot;工具执行: 读文件&quot;]</span><br><span class="line">        T1 --&gt; T2[&quot;工具执行: 搜索代码&quot;]</span><br><span class="line">        T2 --&gt; T3[&quot;工具执行: 编辑文件&quot;]</span><br><span class="line">        T3 --&gt; T4[&quot;工具执行: 运行测试&quot;]</span><br><span class="line">        T4 --&gt; V[&quot;验证结果&quot;]</span><br><span class="line">        V --&gt;|&quot;未完成&quot;| P</span><br><span class="line">        V --&gt;|&quot;完成&quot;| R[&quot;交付结果&quot;]</span><br><span class="line">    end</span><br></pre></td></tr></table></figure>
+
+<p>从”逐行补全”到”目标驱动”，这是编程辅助范式的根本转变。</p>
+<hr>
+<h2 id="二、与同类工具的定位差异"><a href="#二、与同类工具的定位差异" class="headerlink" title="二、与同类工具的定位差异"></a>二、与同类工具的定位差异</h2><table>
+<thead>
+<tr>
+<th>维度</th>
+<th align="center">GitHub Copilot</th>
+<th align="center">Cursor</th>
+<th align="center">Claude Code</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>形态</strong></td>
+<td align="center">IDE 插件</td>
+<td align="center">独立 IDE（Fork VS Code）</td>
+<td align="center">终端 CLI</td>
+</tr>
+<tr>
+<td><strong>交互模式</strong></td>
+<td align="center">行内补全 + Chat</td>
+<td align="center">行内补全 + Chat + Agent</td>
+<td align="center">纯 Agent 对话</td>
+</tr>
+<tr>
+<td><strong>执行能力</strong></td>
+<td align="center">❌ 仅建议</td>
+<td align="center">⚠️ 有限（Agent 模式）</td>
+<td align="center">✅ 完整（读&#x2F;写&#x2F;执行&#x2F;Git）</td>
+</tr>
+<tr>
+<td><strong>代码理解范围</strong></td>
+<td align="center">当前文件为主</td>
+<td align="center">项目级</td>
+<td align="center">项目级 + 全局搜索</td>
+</tr>
+<tr>
+<td><strong>工具数量</strong></td>
+<td align="center">少</td>
+<td align="center">中</td>
+<td align="center">30+ 内置 + MCP 无限扩展</td>
+</tr>
+<tr>
+<td><strong>多 Agent</strong></td>
+<td align="center">❌</td>
+<td align="center">⚠️ 有限</td>
+<td align="center">✅ 四层 Agent 架构</td>
+</tr>
+<tr>
+<td><strong>权限控制</strong></td>
+<td align="center">无需（不执行）</td>
+<td align="center">基础</td>
+<td align="center">五级权限 + 沙箱 + Hook</td>
+</tr>
+<tr>
+<td><strong>扩展方式</strong></td>
+<td align="center">有限</td>
+<td align="center">扩展市场</td>
+<td align="center">MCP + 插件 + Hook + Agent</td>
+</tr>
+<tr>
+<td><strong>IDE 依赖</strong></td>
+<td align="center">强（VS Code 等）</td>
+<td align="center">强（自身即 IDE）</td>
+<td align="center">❌ 无（纯终端）</td>
+</tr>
+</tbody></table>
+<p>Claude Code 的核心差异在于<strong>执行能力</strong>和<strong>无 IDE 依赖</strong>：</p>
+<ol>
+<li><strong>执行能力</strong>：它不是在”建议”你做什么，而是在”做”——直接读写文件、运行命令、操作 Git。这带来了效率的质变，也带来了安全挑战。</li>
+<li><strong>无 IDE 依赖</strong>：终端是程序员最通用的环境。不需要 VS Code，不需要任何特定 IDE，SSH 到远程服务器也能用。</li>
+</ol>
+<hr>
+<h2 id="三、核心架构：Agentic-Loop"><a href="#三、核心架构：Agentic-Loop" class="headerlink" title="三、核心架构：Agentic Loop"></a>三、核心架构：Agentic Loop</h2><p>Claude Code 的核心是一个<strong>Agentic Loop（代理循环）</strong>，不断在三个阶段间循环：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    START[&quot;用户输入&quot;] --&gt; GATHER[&quot;收集上下文&lt;br/&gt;Gather Context&quot;]</span><br><span class="line">    GATHER --&gt; ACT[&quot;执行动作&lt;br/&gt;Take Action&quot;]</span><br><span class="line">    ACT --&gt; VERIFY[&quot;验证结果&lt;br/&gt;Verify Results&quot;]</span><br><span class="line">    VERIFY --&gt;|&quot;需要继续&quot;| GATHER</span><br><span class="line">    VERIFY --&gt;|&quot;任务完成&quot;| END[&quot;交付结果&quot;]</span><br><span class="line"></span><br><span class="line">    GATHER -.-&gt;|&quot;读取文件&lt;br/&gt;搜索代码&lt;br/&gt;加载 CLAUDE.md&quot;| TOOLS1[&quot;工具: Read / Glob / Grep&quot;]</span><br><span class="line">    ACT -.-&gt;|&quot;编辑文件&lt;br/&gt;运行命令&lt;br/&gt;创建子代理&quot;| TOOLS2[&quot;工具: Edit / Write / Bash / Agent&quot;]</span><br><span class="line">    VERIFY -.-&gt;|&quot;运行测试&lt;br/&gt;检查输出&lt;br/&gt;确认变更&quot;| TOOLS3[&quot;工具: Bash / Read / Grep&quot;]</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-1-Harness-概念"><a href="#3-1-Harness-概念" class="headerlink" title="3.1 Harness 概念"></a>3.1 Harness 概念</h3><p>Claude Code 是围绕 Claude 模型构建的 <strong>Harness（框架&#x2F;线束）</strong>。模型负责推理，Harness 负责执行：</p>
+<table>
+<thead>
+<tr>
+<th>职责</th>
+<th align="center">模型（Claude）</th>
+<th align="center">Harness（Claude Code）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>理解用户意图</td>
+<td align="center">✅</td>
+<td align="center"></td>
+</tr>
+<tr>
+<td>选择使用哪个工具</td>
+<td align="center">✅</td>
+<td align="center"></td>
+</tr>
+<tr>
+<td>构造工具参数</td>
+<td align="center">✅</td>
+<td align="center"></td>
+</tr>
+<tr>
+<td>执行工具</td>
+<td align="center"></td>
+<td align="center">✅</td>
+</tr>
+<tr>
+<td>管理上下文窗口</td>
+<td align="center"></td>
+<td align="center">✅</td>
+</tr>
+<tr>
+<td>权限检查</td>
+<td align="center"></td>
+<td align="center">✅</td>
+</tr>
+<tr>
+<td>沙箱隔离</td>
+<td align="center"></td>
+<td align="center">✅</td>
+</tr>
+<tr>
+<td>结果格式化</td>
+<td align="center"></td>
+<td align="center">✅</td>
+</tr>
+<tr>
+<td>判断任务是否完成</td>
+<td align="center">✅</td>
+<td align="center"></td>
+</tr>
+</tbody></table>
+<p>模型是”大脑”，Harness 是”手和眼”。这种分离使得：</p>
+<ul>
+<li>模型升级时，Harness 不变</li>
+<li>新工具加入时，模型自动学会使用（通过工具描述）</li>
+<li>安全策略在 Harness 层执行，模型无法绕过</li>
+</ul>
+<h3 id="3-2-循环的详细流程"><a href="#3-2-循环的详细流程" class="headerlink" title="3.2 循环的详细流程"></a>3.2 循环的详细流程</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">1. 用户输入 → 追加到对话历史</span><br><span class="line">2. 构造 Prompt:</span><br><span class="line">     系统指令 + CLAUDE.md + Auto Memory + 对话历史 + 工具定义</span><br><span class="line">3. 调用 Claude API → 模型返回文本或工具调用</span><br><span class="line">4. 如果是工具调用:</span><br><span class="line">     a. 权限检查（根据当前模式）</span><br><span class="line">     b. 执行工具（可能需要用户确认）</span><br><span class="line">     c. 将工具结果追加到对话历史</span><br><span class="line">     d. 回到步骤 2（继续循环）</span><br><span class="line">5. 如果是纯文本:</span><br><span class="line">     展示给用户 → 等待用户下一轮输入</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="四、分发架构：从-npm-到原生二进制"><a href="#四、分发架构：从-npm-到原生二进制" class="headerlink" title="四、分发架构：从 npm 到原生二进制"></a>四、分发架构：从 npm 到原生二进制</h2><p>Claude Code 的分发方式颇为独特——它是一个<strong>编译为原生二进制的 TypeScript 应用</strong>。</p>
+<h3 id="4-1-Node-js-SEA（Single-Executable-Application）"><a href="#4-1-Node-js-SEA（Single-Executable-Application）" class="headerlink" title="4.1 Node.js SEA（Single Executable Application）"></a>4.1 Node.js SEA（Single Executable Application）</h3><p>Claude Code 使用 Node.js 的 SEA 能力，将整个应用（Node.js 运行时 + 应用代码）打包为单个原生二进制文件：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    SRC[&quot;TypeScript 源码&quot;] --&gt; BUNDLE[&quot;打包为单 JS 文件&quot;]</span><br><span class="line">    BUNDLE --&gt; SEA[&quot;Node.js SEA 封装&quot;]</span><br><span class="line">    SEA --&gt; BIN[&quot;原生二进制&lt;br/&gt;~241MB per platform&quot;]</span><br><span class="line"></span><br><span class="line">    BIN --&gt; MAC_ARM[&quot;claude-code-darwin-arm64&quot;]</span><br><span class="line">    BIN --&gt; MAC_X64[&quot;claude-code-darwin-x64&quot;]</span><br><span class="line">    BIN --&gt; LIN_X64[&quot;claude-code-linux-x64&quot;]</span><br><span class="line">    BIN --&gt; WIN_X64[&quot;claude-code-win32-x64&quot;]</span><br><span class="line">    BIN --&gt; MORE[&quot;...共 10 个平台&quot;]</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-2-npm-多包分发"><a href="#4-2-npm-多包分发" class="headerlink" title="4.2 npm 多包分发"></a>4.2 npm 多包分发</h3><p>主包 <code>@anthropic-ai/claude-code</code> 是一个轻量 wrapper（157KB），它的 <code>postinstall</code> 脚本：</p>
+<ol>
+<li>检测当前平台（OS + CPU + libc 变体）</li>
+<li>安装对应的平台特定包（optional dependency）</li>
+<li>将二进制文件复制&#x2F;硬链接到 <code>bin/claude.exe</code></li>
+</ol>
+<p>这意味着 <code>npm install -g @anthropic-ai/claude-code</code> 会自动选择正确的二进制。</p>
+<h3 id="4-3-为什么选择-SEA？"><a href="#4-3-为什么选择-SEA？" class="headerlink" title="4.3 为什么选择 SEA？"></a>4.3 为什么选择 SEA？</h3><ul>
+<li><strong>零依赖</strong>：用户不需要安装 Node.js（虽然目前仍要求 Node &gt;&#x3D; 22，但未来可能完全独立）</li>
+<li><strong>单文件分发</strong>：没有 node_modules，没有路径问题</li>
+<li><strong>启动快</strong>：省去模块解析的开销</li>
+<li><strong>保护源码</strong>：编译为二进制后，源码不易被直接阅读</li>
+</ul>
+<hr>
+<h2 id="五、源码可及性：如何在不开源的情况下理解架构"><a href="#五、源码可及性：如何在不开源的情况下理解架构" class="headerlink" title="五、源码可及性：如何在不开源的情况下理解架构"></a>五、源码可及性：如何在不开源的情况下理解架构</h2><h3 id="5-1-源码状态"><a href="#5-1-源码状态" class="headerlink" title="5.1 源码状态"></a>5.1 源码状态</h3><p>Claude Code 的核心源码<strong>未开源</strong>。GitHub 仓库 <code>anthropics/claude-code</code> 只包含：</p>
+<ul>
+<li>文档和示例</li>
+<li>插件和 Agent 定义</li>
+<li>Hook 配置示例</li>
+<li>SDK 类型定义</li>
+</ul>
+<h3 id="5-2-逆向理解的途径"><a href="#5-2-逆向理解的途径" class="headerlink" title="5.2 逆向理解的途径"></a>5.2 逆向理解的途径</h3><table>
+<thead>
+<tr>
+<th>途径</th>
+<th align="center">信息量</th>
+<th align="center">可靠性</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>sdk-tools.d.ts</strong></td>
+<td align="center">⭐⭐⭐⭐⭐</td>
+<td align="center">⭐⭐⭐⭐⭐</td>
+</tr>
+<tr>
+<td><strong>官方文档</strong></td>
+<td align="center">⭐⭐⭐⭐</td>
+<td align="center">⭐⭐⭐⭐⭐</td>
+</tr>
+<tr>
+<td><strong>插件源码</strong></td>
+<td align="center">⭐⭐⭐</td>
+<td align="center">⭐⭐⭐⭐⭐</td>
+</tr>
+<tr>
+<td><strong>运行时行为</strong></td>
+<td align="center">⭐⭐⭐⭐</td>
+<td align="center">⭐⭐⭐</td>
+</tr>
+<tr>
+<td><strong>二进制逆向</strong></td>
+<td align="center">⭐⭐⭐⭐⭐</td>
+<td align="center">⭐⭐</td>
+</tr>
+</tbody></table>
+<p><strong>sdk-tools.d.ts 是最宝贵的资源</strong>——3556 行的 TypeScript 类型定义，完整暴露了 30+ 工具的输入输出接口。通过类型定义，我们可以推断：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 从类型定义推断工具设计</span></span><br><span class="line"><span class="keyword">interface</span> <span class="title class_">BashInput</span> &#123;</span><br><span class="line">  <span class="attr">command</span>: <span class="built_in">string</span>                    <span class="comment">// 要执行的命令</span></span><br><span class="line">  <span class="attr">timeout</span>?: <span class="built_in">number</span>                   <span class="comment">// 超时时间 → 说明有超时机制</span></span><br><span class="line">  <span class="attr">description</span>?: <span class="built_in">string</span>               <span class="comment">// 命令描述 → 用于权限提示</span></span><br><span class="line">  <span class="attr">run_in_background</span>?: <span class="built_in">boolean</span>        <span class="comment">// 后台运行 → 说明支持异步执行</span></span><br><span class="line">  <span class="attr">dangerouslyDisableSandbox</span>?: <span class="built_in">boolean</span> <span class="comment">// 禁用沙箱 → 说明有沙箱机制</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">interface</span> <span class="title class_">AgentInput</span> &#123;</span><br><span class="line">  <span class="attr">description</span>: <span class="built_in">string</span>                <span class="comment">// 子代理描述</span></span><br><span class="line">  <span class="attr">prompt</span>: <span class="built_in">string</span>                     <span class="comment">// 子代理的 Prompt</span></span><br><span class="line">  <span class="attr">subagent_type</span>?: <span class="built_in">string</span>             <span class="comment">// 代理类型 → 说明有预定义的代理类型</span></span><br><span class="line">  <span class="attr">model</span>?: <span class="built_in">string</span>                     <span class="comment">// 模型选择 → 说明子代理可用不同模型</span></span><br><span class="line">  <span class="attr">run_in_background</span>?: <span class="built_in">boolean</span>        <span class="comment">// 后台运行</span></span><br><span class="line">  <span class="attr">name</span>?: <span class="built_in">string</span>                      <span class="comment">// 代理名称</span></span><br><span class="line">  <span class="attr">mode</span>?: <span class="built_in">string</span>                      <span class="comment">// 运行模式</span></span><br><span class="line">  <span class="attr">isolation</span>?: <span class="built_in">string</span>                 <span class="comment">// 隔离方式（worktree/remote）</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>从接口定义就能读出设计意图：<code>Bash</code> 有沙箱和超时 → 安全优先；<code>Agent</code> 有隔离方式 → 支持并行开发不冲突。</p>
+<h3 id="5-3-本系列的解读方法"><a href="#5-3-本系列的解读方法" class="headerlink" title="5.3 本系列的解读方法"></a>5.3 本系列的解读方法</h3><p>本系列采用<strong>架构逆向工程</strong>的方法：</p>
+<ol>
+<li><strong>从接口推断实现</strong>：类型定义 → 设计模式 → 实现推测</li>
+<li><strong>从文档验证推断</strong>：官方文档描述 → 与类型定义交叉验证</li>
+<li><strong>从行为观察机制</strong>：实际使用中的行为 → 推断内部机制</li>
+<li><strong>从插件理解扩展点</strong>：开源插件 → 理解框架的扩展接口</li>
+</ol>
+<hr>
+<h2 id="六、Claude-Code-的设计哲学"><a href="#六、Claude-Code-的设计哲学" class="headerlink" title="六、Claude Code 的设计哲学"></a>六、Claude Code 的设计哲学</h2><p>从架构中可以读出几个清晰的设计哲学：</p>
+<h3 id="6-1-安全优先，能力其次"><a href="#6-1-安全优先，能力其次" class="headerlink" title="6.1 安全优先，能力其次"></a>6.1 安全优先，能力其次</h3><ul>
+<li>五级权限模式，从手动确认到全自动</li>
+<li>OS 级沙箱隔离，防止命令越权</li>
+<li>Auto 模式用独立分类器审查，且分类器<strong>不看工具输出</strong>（防注入）</li>
+<li>Hook 系统允许在任意生命周期点拦截</li>
+</ul>
+<h3 id="6-2-组合优于继承"><a href="#6-2-组合优于继承" class="headerlink" title="6.2 组合优于继承"></a>6.2 组合优于继承</h3><ul>
+<li>30+ 原子工具，通过组合实现复杂任务</li>
+<li>Agent 系统四层架构，每层都是独立可组合的</li>
+<li>MCP 协议让外部工具无缝接入</li>
+<li>插件系统：commands + agents + skills + hooks + mcp，各司其职</li>
+</ul>
+<h3 id="6-3-上下文是第一公民"><a href="#6-3-上下文是第一公民" class="headerlink" title="6.3 上下文是第一公民"></a>6.3 上下文是第一公民</h3><ul>
+<li>CLAUDE.md 三级体系（项目&#x2F;用户&#x2F;托管）</li>
+<li>Auto Memory 自动学习并持久化</li>
+<li>压缩策略精心设计：保留什么、丢弃什么、何时触发</li>
+<li>Prompt Caching 减少重复计算</li>
+</ul>
+<h3 id="6-4-开放扩展，封闭修改"><a href="#6-4-开放扩展，封闭修改" class="headerlink" title="6.4 开放扩展，封闭修改"></a>6.4 开放扩展，封闭修改</h3><ul>
+<li>MCP 协议：任何语言的服务都能接入</li>
+<li>插件系统：社区可以贡献新能力</li>
+<li>Hook 系统：不改源码就能改变行为</li>
+<li>Agent 定义：用 Markdown 就能创建新代理</li>
+</ul>
+<hr>
+<h2 id="七、系列文章导读"><a href="#七、系列文章导读" class="headerlink" title="七、系列文章导读"></a>七、系列文章导读</h2><table>
+<thead>
+<tr>
+<th>篇目</th>
+<th>主题</th>
+<th>核心内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>第二篇</strong></td>
+<td>Agentic Loop</td>
+<td>核心循环、Harness 概念、会话生命周期</td>
+</tr>
+<tr>
+<td><strong>第三篇</strong></td>
+<td>工具系统</td>
+<td>30+ 工具分类、sdk-tools.d.ts 逆向、关键工具深度解析</td>
+</tr>
+<tr>
+<td><strong>第四篇</strong></td>
+<td>Agent 系统</td>
+<td>四层 Agent 架构、子代理、团队协作、Dynamic Workflows</td>
+</tr>
+<tr>
+<td><strong>第五篇</strong></td>
+<td>上下文管理</td>
+<td>压缩策略、CLAUDE.md 体系、Auto Memory、Checkpointing</td>
+</tr>
+<tr>
+<td><strong>第六篇</strong></td>
+<td>权限与安全</td>
+<td>五级权限、沙箱、Auto 分类器、Hook 系统</td>
+</tr>
+<tr>
+<td><strong>第七篇</strong></td>
+<td>MCP 与插件</td>
+<td>MCP 集成、插件架构、开源插件分析、设计哲学总结</td>
+</tr>
+</tbody></table>
+<hr>
+<p><strong>参考资源</strong>：</p>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://code.claude.com/docs/en/overview">Claude Code 官方文档</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/anthropics/claude-code">Claude Code GitHub 仓库</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.npmjs.com/package/@anthropic-ai/claude-code">Claude Code npm 包</a></li>
+<li><a target="_blank" rel="noopener" href="https://modelcontextprotocol.io/">Model Context Protocol 规范</a></li>
+</ul>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://wswjcl.github.io">Sugle</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://wswjcl.github.io/posts/a0e2fc71/">https://wswjcl.github.io/posts/a0e2fc71/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://wswjcl.github.io" target="_blank">Sugle's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/AI%E5%B7%A5%E7%A8%8B/">AI工程</a></div><div class="post-share"><div class="social-share" data-image="/img/default_cover.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.4/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.4/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/posts/692376e8/" title="RAG 系列（七）：评估与优化 — 闭环提升"><img class="cover" src= "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-lazy-src="/img/default_cover.png" onerror="onerror=null;src='/img/404.jpg'" alt="cover of next post"><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">RAG 系列（七）：评估与优化 — 闭环提升</div></div><div class="info-2"><div class="info-item-1">RAG 系统搭建完成后，如何知道它好不好？哪里需要改进？评估是 RAG 工程化落地的关键一环——没有评估，优化就是盲人摸象。同时，RAG 技术本身也在快速演进，GraphRAG、Self-RAG、Adaptive RAG 等新范式不断涌现。 本文将系统讲解 RAG 的评估方法与前沿趋势，为整个系列收尾。  一、为什么评估如此重要？RAG 是一个多组件级联系统，任何一个环节的短板都会影响最终效果。评估的核心价值在于：  定位瓶颈：是检索召回不够？还是重排序不准？还是 LLM 没用好上下文？ 指导优化：知道哪里差，才能有针对性地改进 回归保障：修改某环节后，确保不会导致其他指标退化 效果量化：向利益相关方证明系统的实际价值  12345678910111213141516flowchart TB    EVAL[&quot;评估&quot;] --&gt; COMP[&quot;组件级评估&quot;]    EVAL --&gt; E2E[&quot;端到端评估&quot;]    COMP --&gt; RET[&quot;检索评估&lt;br/&gt;Recall /...</div></div></div></a></nav></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src= "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-lazy-src="/img/head.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Sugle</div><div class="author-info-description">人生是旷野</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">15</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">4</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">4</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/Wswjcl"><i class="fab fa-github"></i><span>GitHub</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/Wswjcl" target="_blank" title="GitHub"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:wswjcl@gmail.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到 Sugle's Blog。每周至少更新 1 篇，记录思考、生活与成长。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E3%80%81Claude-Code-%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F"><span class="toc-number">1.</span> <span class="toc-text">一、Claude Code 是什么？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%E3%80%81%E4%B8%8E%E5%90%8C%E7%B1%BB%E5%B7%A5%E5%85%B7%E7%9A%84%E5%AE%9A%E4%BD%8D%E5%B7%AE%E5%BC%82"><span class="toc-number">2.</span> <span class="toc-text">二、与同类工具的定位差异</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%E3%80%81%E6%A0%B8%E5%BF%83%E6%9E%B6%E6%9E%84%EF%BC%9AAgentic-Loop"><span class="toc-number">3.</span> <span class="toc-text">三、核心架构：Agentic Loop</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#3-1-Harness-%E6%A6%82%E5%BF%B5"><span class="toc-number">3.1.</span> <span class="toc-text">3.1 Harness 概念</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-2-%E5%BE%AA%E7%8E%AF%E7%9A%84%E8%AF%A6%E7%BB%86%E6%B5%81%E7%A8%8B"><span class="toc-number">3.2.</span> <span class="toc-text">3.2 循环的详细流程</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9B%9B%E3%80%81%E5%88%86%E5%8F%91%E6%9E%B6%E6%9E%84%EF%BC%9A%E4%BB%8E-npm-%E5%88%B0%E5%8E%9F%E7%94%9F%E4%BA%8C%E8%BF%9B%E5%88%B6"><span class="toc-number">4.</span> <span class="toc-text">四、分发架构：从 npm 到原生二进制</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#4-1-Node-js-SEA%EF%BC%88Single-Executable-Application%EF%BC%89"><span class="toc-number">4.1.</span> <span class="toc-text">4.1 Node.js SEA（Single Executable Application）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-2-npm-%E5%A4%9A%E5%8C%85%E5%88%86%E5%8F%91"><span class="toc-number">4.2.</span> <span class="toc-text">4.2 npm 多包分发</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-3-%E4%B8%BA%E4%BB%80%E4%B9%88%E9%80%89%E6%8B%A9-SEA%EF%BC%9F"><span class="toc-number">4.3.</span> <span class="toc-text">4.3 为什么选择 SEA？</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%94%E3%80%81%E6%BA%90%E7%A0%81%E5%8F%AF%E5%8F%8A%E6%80%A7%EF%BC%9A%E5%A6%82%E4%BD%95%E5%9C%A8%E4%B8%8D%E5%BC%80%E6%BA%90%E7%9A%84%E6%83%85%E5%86%B5%E4%B8%8B%E7%90%86%E8%A7%A3%E6%9E%B6%E6%9E%84"><span class="toc-number">5.</span> <span class="toc-text">五、源码可及性：如何在不开源的情况下理解架构</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#5-1-%E6%BA%90%E7%A0%81%E7%8A%B6%E6%80%81"><span class="toc-number">5.1.</span> <span class="toc-text">5.1 源码状态</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-2-%E9%80%86%E5%90%91%E7%90%86%E8%A7%A3%E7%9A%84%E9%80%94%E5%BE%84"><span class="toc-number">5.2.</span> <span class="toc-text">5.2 逆向理解的途径</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-3-%E6%9C%AC%E7%B3%BB%E5%88%97%E7%9A%84%E8%A7%A3%E8%AF%BB%E6%96%B9%E6%B3%95"><span class="toc-number">5.3.</span> <span class="toc-text">5.3 本系列的解读方法</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AD%E3%80%81Claude-Code-%E7%9A%84%E8%AE%BE%E8%AE%A1%E5%93%B2%E5%AD%A6"><span class="toc-number">6.</span> <span class="toc-text">六、Claude Code 的设计哲学</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#6-1-%E5%AE%89%E5%85%A8%E4%BC%98%E5%85%88%EF%BC%8C%E8%83%BD%E5%8A%9B%E5%85%B6%E6%AC%A1"><span class="toc-number">6.1.</span> <span class="toc-text">6.1 安全优先，能力其次</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-2-%E7%BB%84%E5%90%88%E4%BC%98%E4%BA%8E%E7%BB%A7%E6%89%BF"><span class="toc-number">6.2.</span> <span class="toc-text">6.2 组合优于继承</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-3-%E4%B8%8A%E4%B8%8B%E6%96%87%E6%98%AF%E7%AC%AC%E4%B8%80%E5%85%AC%E6%B0%91"><span class="toc-number">6.3.</span> <span class="toc-text">6.3 上下文是第一公民</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-4-%E5%BC%80%E6%94%BE%E6%89%A9%E5%B1%95%EF%BC%8C%E5%B0%81%E9%97%AD%E4%BF%AE%E6%94%B9"><span class="toc-number">6.4.</span> <span class="toc-text">6.4 开放扩展，封闭修改</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%83%E3%80%81%E7%B3%BB%E5%88%97%E6%96%87%E7%AB%A0%E5%AF%BC%E8%AF%BB"><span class="toc-number">7.</span> <span class="toc-text">七、系列文章导读</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item"><a class="thumbnail" href="/posts/a0e2fc71/" title="Claude Code 源码解读（一）：概述 — 一个 Agentic Coding 工具的诞生"><img src= "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-lazy-src="/img/default_cover.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="Claude Code 源码解读（一）：概述 — 一个 Agentic Coding 工具的诞生"/></a><div class="content"><a class="title" href="/posts/a0e2fc71/" title="Claude Code 源码解读（一）：概述 — 一个 Agentic Coding 工具的诞生">Claude Code 源码解读（一）：概述 — 一个 Agentic Coding 工具的诞生</a><time datetime="2026-07-11T02:00:00.000Z" title="发表于 2026-07-11 10:00:00">2026-07-11</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/posts/692376e8/" title="RAG 系列（七）：评估与优化 — 闭环提升"><img src= "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-lazy-src="/img/default_cover.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="RAG 系列（七）：评估与优化 — 闭环提升"/></a><div class="content"><a class="title" href="/posts/692376e8/" title="RAG 系列（七）：评估与优化 — 闭环提升">RAG 系列（七）：评估与优化 — 闭环提升</a><time datetime="2026-07-10T06:00:00.000Z" title="发表于 2026-07-10 14:00:00">2026-07-10</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/posts/b598eb07/" title="RAG 系列（六）：重排序与上下文整合 — 最后的精炼"><img src= "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-lazy-src="/img/default_cover.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="RAG 系列（六）：重排序与上下文整合 — 最后的精炼"/></a><div class="content"><a class="title" href="/posts/b598eb07/" title="RAG 系列（六）：重排序与上下文整合 — 最后的精炼">RAG 系列（六）：重排序与上下文整合 — 最后的精炼</a><time datetime="2026-07-10T04:00:00.000Z" title="发表于 2026-07-10 12:00:00">2026-07-10</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/posts/d573e208/" title="RAG 系列（五）：检索策略 — 精准找到所需信息"><img src= "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-lazy-src="/img/default_cover.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="RAG 系列（五）：检索策略 — 精准找到所需信息"/></a><div class="content"><a class="title" href="/posts/d573e208/" title="RAG 系列（五）：检索策略 — 精准找到所需信息">RAG 系列（五）：检索策略 — 精准找到所需信息</a><time datetime="2026-07-10T02:00:00.000Z" title="发表于 2026-07-10 10:00:00">2026-07-10</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/posts/b07fb9ab/" title="RAG 系列（四）：向量存储与索引 — 十亿级检索的幕后"><img src= "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-lazy-src="/img/default_cover.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="RAG 系列（四）：向量存储与索引 — 十亿级检索的幕后"/></a><div class="content"><a class="title" href="/posts/b07fb9ab/" title="RAG 系列（四）：向量存储与索引 — 十亿级检索的幕后">RAG 系列（四）：向量存储与索引 — 十亿级检索的幕后</a><time datetime="2026-07-09T10:00:00.000Z" title="发表于 2026-07-09 18:00:00">2026-07-09</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2019 - 2026 By Sugle</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.2.2"></script><script src="/js/main.js?v=5.2.2"></script><script src="https://cdn.jsdelivr.net/npm/medium-zoom@1.1.0/dist/medium-zoom.min.js"></script><script src="https://cdn.jsdelivr.net/npm/instant.page@5.2.0/instantpage.min.js" type="module"></script><script src="https://cdn.jsdelivr.net/npm/vanilla-lazyload@19.1.3/dist/lazyload.iife.min.js"></script><script>(() => {
+  const panguFn = () => {
+    if (typeof pangu === 'object') pangu.autoSpacingPage()
+    else {
+      btf.getScript('https://cdn.jsdelivr.net/npm/pangu@4.0.7/dist/browser/pangu.min.js')
+        .then(() => {
+          pangu.autoSpacingPage()
+        })
+    }
+  }
+
+  const panguInit = () => {
+    if (false){
+      GLOBAL_CONFIG_SITE.isPost && panguFn()
+    } else {
+      panguFn()
+    }
+  }
+
+  btf.addGlobalFn('pjaxComplete', panguInit, 'pangu')
+  document.addEventListener('DOMContentLoaded', panguInit)
+})()</script><div class="js-pjax"><script>(() => {
+  const runMermaid = ele => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    ele.forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = `%%{init:{ 'theme':'${theme}'}}%%\n`
+      const mermaidID = `mermaid-${index}`
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+      const renderMermaid = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      // mermaid v9 and v10 compatibility
+      typeof renderFn === 'string' ? renderMermaid(renderFn) : renderFn.then(({ svg }) => renderMermaid(svg))
+    })
+  }
+
+  const codeToMermaid = () => {
+    const codeMermaidEle = document.querySelectorAll('pre > code.mermaid')
+    if (codeMermaidEle.length === 0) return
+
+    codeMermaidEle.forEach(ele => {
+      const preEle = document.createElement('pre')
+      preEle.className = 'mermaid-src'
+      preEle.hidden = true
+      preEle.textContent = ele.textContent
+      const newEle = document.createElement('div')
+      newEle.className = 'mermaid-wrap'
+      newEle.appendChild(preEle)
+      ele.parentNode.replaceWith(newEle)
+    })
+  }
+
+  const loadMermaid = () => {
+    if (true) codeToMermaid()
+    const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+    if ($mermaid.length === 0) return
+
+    const runMermaidFn = () => runMermaid($mermaid)
+    btf.addGlobalFn('themeChange', runMermaidFn, 'mermaid')
+    window.loadMermaid ? runMermaidFn() : btf.getScript('https://cdn.jsdelivr.net/npm/mermaid@11.4.0/dist/mermaid.min.js').then(runMermaidFn)
+  }
+
+  btf.addGlobalFn('encrypt', loadMermaid, 'mermaid')
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aplayer@1.10.1/dist/APlayer.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/aplayer@1.10.1/dist/APlayer.min.js"></script><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.4/metingjs/dist/Meting.min.js"></script><script>(() => {
+  const destroyAplayer = () => {
+    if (window.aplayers) {
+      for (let i = 0; i < window.aplayers.length; i++) {
+        if (!window.aplayers[i].options.fixed) {
+          window.aplayers[i].destroy()
+        }
+      }
+    }
+  }
+
+  const runMetingJS = () => {
+    typeof loadMeting === 'function' && document.getElementsByClassName('aplayer').length && loadMeting()
+  }
+
+  btf.addGlobalFn('pjaxSend', destroyAplayer, 'destroyAplayer')
+  btf.addGlobalFn('pjaxComplete', loadMeting, 'runMetingJS')
+})()</script><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script>(() => {
+  const pjaxSelectors = ["head > title","#config-diff","#body-wrap","#rightside-config-hide","#rightside-config-show",".js-pjax"]
+
+  window.pjax = new Pjax({
+    elements: 'a:not([target="_blank"]):not([href="/music/"])',
+    selectors: pjaxSelectors,
+    cacheBust: false,
+    analytics: false,
+    scrollRestoration: false
+  })
+
+  const triggerPjaxFn = (val) => {
+    if (!val) return
+    Object.values(val).forEach(fn => fn())
+  }
+
+  document.addEventListener('pjax:send', () => {
+    // removeEventListener
+    btf.removeGlobalFnEvent('pjaxSendOnce')
+    btf.removeGlobalFnEvent('themeChange')
+
+    // reset readmode
+    const $bodyClassList = document.body.classList
+    if ($bodyClassList.contains('read-mode')) $bodyClassList.remove('read-mode')
+
+    triggerPjaxFn(window.globalFn.pjaxSend)
+  })
+
+  document.addEventListener('pjax:complete', () => {
+    btf.removeGlobalFnEvent('pjaxCompleteOnce')
+    document.querySelectorAll('script[data-pjax]').forEach(item => {
+      const newScript = document.createElement('script')
+      const content = item.text || item.textContent || item.innerHTML || ""
+      Array.from(item.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value))
+      newScript.appendChild(document.createTextNode(content))
+      item.parentNode.replaceChild(newScript, item)
+    })
+
+    triggerPjaxFn(window.globalFn.pjaxComplete)
+  })
+
+  document.addEventListener('pjax:error', e => {
+    if (e.request.status === 404) {
+      pjax.loadUrl('/404')
+    }
+  })
+})()</script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><span id="loading-status"></span><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="search-wrap"><div id="local-search-input"><div class="local-search-box"><input class="local-search-box--input" placeholder="搜索文章" type="text"/></div></div><hr/><div id="local-search-results"></div><div id="local-search-stats-wrap"></div></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.2.2"></script></div></div></body></html>
